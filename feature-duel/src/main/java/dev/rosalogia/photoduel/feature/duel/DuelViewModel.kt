@@ -10,6 +10,7 @@ import dagger.assisted.AssistedInject
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dev.rosalogia.photoduel.core.common.AppLog
 import dev.rosalogia.photoduel.core.data.DuelRepository
+import dev.rosalogia.photoduel.core.data.GroupEditor
 import dev.rosalogia.photoduel.core.data.GroupRepository
 import dev.rosalogia.photoduel.core.data.PreScoreRepository
 import dev.rosalogia.photoduel.core.data.PhotoGroup
@@ -80,6 +81,7 @@ class DuelViewModel @AssistedInject constructor(
     private val aligner: Aligner,
     private val preScores: PreScoreRepository,
     private val faces: FaceAnalyzer,
+    private val editor: GroupEditor,
 ) : ViewModel() {
     @AssistedFactory
     interface Factory {
@@ -272,6 +274,26 @@ class DuelViewModel @AssistedInject constructor(
         render()
         decisionIds += duels.record(groupId, winner, loser, flipCount)
         AppLog.d(TAG, "Group $groupId ${s.round} step ${m.step + 1}/${m.totalSteps}: $winner beat $loser ($flipCount flips)")
+    }
+
+    /**
+     * "These aren't duplicates": keeps the challenger by taking it out of the group, then carries on
+     * with the rest. Stored decisions still replay, since only a not-yet-faced photo is removed.
+     */
+    fun keepBoth() = act {
+        val s = _state.value as? DuelUiState.Dueling ?: return@act
+        if (s.round != Round.MAIN) return@act
+        val challenger = s.matchup.challenger
+        AppLog.i(TAG, "Group $groupId: keep both ${s.matchup.king} and $challenger; removing $challenger from group")
+        editor.removePhoto(challenger)
+        if (groups.getGroup(groupId) == null) {
+            // Only two photos were left, so there's no group anymore and nothing to choose.
+            _events.send(DuelEvent.Message("Kept both. They're no longer grouped."))
+            _events.send(DuelEvent.Close)
+            return@act
+        }
+        _events.send(DuelEvent.Message("Kept both. That photo is no longer in this group."))
+        load()
     }
 
     fun undo() = act {

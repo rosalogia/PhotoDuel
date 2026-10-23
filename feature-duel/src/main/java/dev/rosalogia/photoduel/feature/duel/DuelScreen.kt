@@ -77,7 +77,13 @@ fun DuelRoute(groupId: Long, onClose: () -> Unit) {
             when (val s = state) {
                 DuelUiState.Loading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
                 is DuelUiState.Error -> ErrorView(s.message, onClose)
-                is DuelUiState.Dueling -> DuelScreen(s, onBack = onClose, onPick = viewModel::pick, onUndo = viewModel::undo)
+                is DuelUiState.Dueling -> DuelScreen(
+                    s,
+                    onBack = onClose,
+                    onPick = viewModel::pick,
+                    onUndo = viewModel::undo,
+                    onKeepBoth = viewModel::keepBoth,
+                )
                 is DuelUiState.Result -> ResultScreen(
                     state = s,
                     onBack = onClose,
@@ -111,6 +117,7 @@ fun DuelScreen(
     onBack: () -> Unit,
     onPick: (keepChallenger: Boolean, flipCount: Int) -> Unit,
     onUndo: () -> Unit,
+    onKeepBoth: () -> Unit,
 ) {
     val zoom = remember { ZoomState() }
     var showChallenger by remember { mutableStateOf(false) }
@@ -140,6 +147,9 @@ fun DuelScreen(
                 style = MaterialTheme.typography.titleMedium,
                 modifier = Modifier.weight(1f).testTag("duelProgress"),
             )
+            if (state.round == Round.MAIN) {
+                TextButton(onClick = onKeepBoth, enabled = state.ready, modifier = Modifier.testTag("keepBoth")) { Text("Keep both") }
+            }
             TextButton(onClick = onUndo, enabled = state.canUndo, modifier = Modifier.testTag("undo")) { Text("Undo") }
         }
 
