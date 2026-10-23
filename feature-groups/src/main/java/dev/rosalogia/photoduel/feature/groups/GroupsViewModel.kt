@@ -22,7 +22,7 @@ import kotlinx.coroutines.launch
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 
-enum class GroupsTab { TODO, DONE }
+enum class GroupsTab { TODO, DONE, HIGHLIGHTS }
 
 data class GroupsUiState(
     val tab: GroupsTab = GroupsTab.TODO,
@@ -34,7 +34,11 @@ data class GroupsUiState(
     val analyzing: Int = 0,
     val loaded: Boolean = false,
 ) {
-    val visible: List<PhotoGroup> get() = if (tab == GroupsTab.TODO) todo else done
+    val visible: List<PhotoGroup> get() = when (tab) {
+        GroupsTab.TODO -> todo
+        GroupsTab.DONE -> done
+        GroupsTab.HIGHLIGHTS -> emptyList()
+    }
 }
 
 @OptIn(ExperimentalCoroutinesApi::class)

@@ -74,7 +74,7 @@ fun FeedRoute(
         jumped()
     }
 
-    val listNavigation = DuelNavigation(icon = Icons.AutoMirrored.Filled.List, label = "All groups", onClick = onOpenList)
+    val listNavigation = DuelNavigation(icon = Icons.AutoMirrored.Filled.List, label = "Library", onClick = onOpenList)
     DuelTheme {
         Column(Modifier.fillMaxSize()) {
             if (banner != null) Box(Modifier.statusBarsPadding()) { banner() }
@@ -128,7 +128,7 @@ private fun EmptyFeed(state: FeedUiState, onOpenList: () -> Unit, onShowAllTime:
         if (!state.showAllTime && state.analyzing == 0 && !state.indexing) {
             Button(onClick = onShowAllTime, modifier = Modifier.testTag("feedAllTime")) { Text("Include older photos") }
         }
-        OutlinedButton(onClick = onOpenList, modifier = Modifier.testTag("feedOpenList")) { Text("All groups") }
+        OutlinedButton(onClick = onOpenList, modifier = Modifier.testTag("feedOpenList")) { Text("Library") }
     }
 }
 

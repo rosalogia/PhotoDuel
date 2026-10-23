@@ -61,6 +61,7 @@ fun GroupsRoute(
     onEditGroup: (Long) -> Unit,
     topBarActions: @Composable () -> Unit = {},
     banner: @Composable () -> Unit = {},
+    highlights: @Composable () -> Unit = {},
     viewModel: GroupsViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -74,6 +75,7 @@ fun GroupsRoute(
         onEditGroup = onEditGroup,
         topBarActions = topBarActions,
         banner = banner,
+        highlights = highlights,
     )
 }
 
@@ -90,24 +92,29 @@ fun GroupsScreen(
     onEditGroup: (Long) -> Unit,
     topBarActions: @Composable () -> Unit = {},
     banner: @Composable () -> Unit = {},
+    /** Content of the Highlights tab. */
+    highlights: @Composable () -> Unit = {},
 ) {
+    val bursts = state.tab != GroupsTab.HIGHLIGHTS
     Scaffold(
         topBar = {
             Column {
                 TopAppBar(
-                    title = { Text("All groups") },
+                    title = { Text("Library") },
                     navigationIcon = {
                         IconButton(onClick = onBack, modifier = Modifier.testTag("listBack")) {
                             Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back to feed")
                         }
                     },
                     actions = {
-                        FilterChip(
-                            selected = state.showAllTime,
-                            onClick = { onShowAllTime(!state.showAllTime) },
-                            label = { Text(if (state.showAllTime) "All time" else "Last 30 days") },
-                            modifier = Modifier.testTag("scopeToggle"),
-                        )
+                        if (bursts) {
+                            FilterChip(
+                                selected = state.showAllTime,
+                                onClick = { onShowAllTime(!state.showAllTime) },
+                                label = { Text(if (state.showAllTime) "All time" else "Last 30 days") },
+                                modifier = Modifier.testTag("scopeToggle"),
+                            )
+                        }
                         topBarActions()
                     },
                 )
@@ -122,13 +129,19 @@ fun GroupsScreen(
                         onClick = { onTab(GroupsTab.DONE) },
                         text = { Text("Done (${state.done.size})") },
                     )
+                    Tab(
+                        selected = state.tab == GroupsTab.HIGHLIGHTS,
+                        onClick = { onTab(GroupsTab.HIGHLIGHTS) },
+                        text = { Text("Highlights") },
+                        modifier = Modifier.testTag("highlightsTabButton"),
+                    )
                 }
                 if (state.indexing || state.analyzing > 0) {
                     LinearProgressIndicator(Modifier.fillMaxWidth().testTag("indexing"))
                 } else {
                     Spacer(Modifier.height(4.dp))
                 }
-                if (state.analyzing > 0) {
+                if (bursts && state.analyzing > 0) {
                     Text(
                         "Analyzing photos… ${state.analyzing} left. Groups may still change.",
                         style = MaterialTheme.typography.bodySmall,
@@ -141,7 +154,9 @@ fun GroupsScreen(
     ) { padding ->
         Column(Modifier.padding(padding).fillMaxSize()) {
             banner()
-            if (state.loaded && state.visible.isEmpty()) {
+            if (!bursts) {
+                highlights()
+            } else if (state.loaded && state.visible.isEmpty()) {
                 EmptyState(state)
             } else {
                 LazyColumn(

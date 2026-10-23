@@ -14,8 +14,8 @@ android {
         applicationId = "dev.rosalogia.photoduel"
         minSdk = 30
         targetSdk = 37
-        versionCode = 4
-        versionName = "0.1.3"
+        versionCode = 5
+        versionName = "0.2.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
@@ -79,6 +79,7 @@ dependencies {
     implementation(project(":core-ml"))
     implementation(project(":feature-groups"))
     implementation(project(":feature-duel"))
+    implementation(project(":feature-highlights"))
 
     val composeBom = platform(libs.androidx.compose.bom)
     implementation(composeBom)

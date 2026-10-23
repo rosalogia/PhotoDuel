@@ -168,3 +168,109 @@ interface DuelDao {
     @Query("UPDATE duel_decision SET undone = 1 WHERE group_id = :groupId")
     suspend fun clearGroup(groupId: Long)
 }
+
+data class PhotoScoreTimeRow(
+    @ColumnInfo(name = "media_id") val mediaId: Long,
+    @ColumnInfo(name = "date_taken") val dateTaken: Long,
+    @ColumnInfo(name = "pre_score") val preScore: Float?,
+)
+
+data class MembershipRow(
+    @ColumnInfo(name = "media_id") val mediaId: Long,
+    @ColumnInfo(name = "group_id") val groupId: Long,
+    val status: GroupStatus,
+    @ColumnInfo(name = "winner_media_id") val winnerMediaId: Long?,
+)
+
+data class HighlightSetSummary(
+    @Embedded val set: HighlightSetEntity,
+    @ColumnInfo(name = "item_count") val itemCount: Int,
+    @ColumnInfo(name = "selected_count") val selectedCount: Int,
+)
+
+@Dao
+interface HighlightDao {
+    @Query("SELECT date_taken FROM photo")
+    suspend fun allPhotoTimes(): List<Long>
+
+    @Query("SELECT media_id, date_taken, pre_score FROM photo WHERE date_taken >= :start AND date_taken < :end ORDER BY date_taken, media_id")
+    suspend fun photosInRange(start: Long, end: Long): List<PhotoScoreTimeRow>
+
+    @Query(
+        """
+        SELECT m.media_id, m.group_id, g.status, g.winner_media_id FROM group_member m
+        JOIN photo_group g ON g.group_id = m.group_id
+        WHERE m.media_id IN (:mediaIds)
+        """,
+    )
+    suspend fun memberships(mediaIds: List<Long>): List<MembershipRow>
+
+    @Query(
+        """
+        SELECT s.*, COUNT(i.media_id) AS item_count, COALESCE(SUM(i.selected), 0) AS selected_count
+        FROM highlight_set s LEFT JOIN highlight_item i ON i.set_id = s.set_id
+        GROUP BY s.set_id ORDER BY s.updated_at DESC
+        """,
+    )
+    fun observeSets(): Flow<List<HighlightSetSummary>>
+
+    @Query("SELECT * FROM highlight_set WHERE set_id = :setId")
+    suspend fun getSet(setId: Long): HighlightSetEntity?
+
+    @Insert
+    suspend fun insertSet(set: HighlightSetEntity): Long
+
+    @Query("UPDATE highlight_set SET phase = :phase, pass_count = :passCount, updated_at = :now WHERE set_id = :setId")
+    suspend fun setProgress(setId: Long, phase: HighlightPhase, passCount: Int, now: Long)
+
+    @Query("UPDATE highlight_set SET name = :name, updated_at = :now WHERE set_id = :setId")
+    suspend fun rename(setId: Long, name: String, now: Long)
+
+    @Query("DELETE FROM highlight_set WHERE set_id = :setId")
+    suspend fun deleteSet(setId: Long)
+
+    @Insert
+    suspend fun insertItems(items: List<HighlightItemEntity>)
+
+    /** Items whose photo still exists, in order. */
+    @Query(
+        """
+        SELECT i.* FROM highlight_item i JOIN photo p ON p.media_id = i.media_id
+        WHERE i.set_id = :setId ORDER BY i.position
+        """,
+    )
+    suspend fun items(setId: Long): List<HighlightItemEntity>
+
+    @Query("DELETE FROM highlight_item WHERE set_id = :setId")
+    suspend fun deleteItems(setId: Long)
+
+    @Query("UPDATE highlight_item SET selected = (media_id IN (:mediaIds)) WHERE set_id = :setId")
+    suspend fun setSelected(setId: Long, mediaIds: List<Long>)
+
+    @Query("UPDATE highlight_item SET album_media_id = :albumMediaId WHERE set_id = :setId AND media_id = :mediaId")
+    suspend fun setAlbumCopy(setId: Long, mediaId: Long, albumMediaId: Long?)
+
+    @Query("SELECT * FROM highlight_cull WHERE set_id = :setId ORDER BY pass, decided_at, id")
+    suspend fun culls(setId: Long): List<HighlightCullEntity>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertCull(cull: HighlightCullEntity): Long
+
+    @Query("DELETE FROM highlight_cull WHERE id = :id")
+    suspend fun deleteCull(id: Long)
+
+    @Query("DELETE FROM highlight_cull WHERE set_id = :setId")
+    suspend fun deleteCulls(setId: Long)
+
+    @Query("SELECT * FROM highlight_comparison WHERE set_id = :setId ORDER BY decided_at, id")
+    suspend fun comparisons(setId: Long): List<HighlightComparisonEntity>
+
+    @Insert
+    suspend fun insertComparison(c: HighlightComparisonEntity): Long
+
+    @Query("DELETE FROM highlight_comparison WHERE id IN (:ids)")
+    suspend fun deleteComparisons(ids: List<Long>)
+
+    @Query("DELETE FROM highlight_comparison WHERE set_id = :setId")
+    suspend fun deleteAllComparisons(setId: Long)
+}

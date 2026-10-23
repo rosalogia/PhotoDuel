@@ -1,5 +1,6 @@
 package dev.rosalogia.photoduel.core.data.media
 
+import android.content.ClipData
 import android.content.Context
 import android.content.Intent
 import android.content.IntentSender
@@ -27,6 +28,19 @@ class LibraryActions @Inject constructor(
         val send = Intent(Intent.ACTION_SEND).apply {
             type = "image/*"
             putExtra(Intent.EXTRA_STREAM, mediaContentUri(mediaId))
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+        return Intent.createChooser(send, null)
+    }
+
+    fun shareIntent(mediaIds: List<Long>): Intent {
+        if (mediaIds.size == 1) return shareIntent(mediaIds.single())
+        val uris = ArrayList(mediaIds.map(::mediaContentUri))
+        val send = Intent(Intent.ACTION_SEND_MULTIPLE).apply {
+            type = "image/*"
+            putParcelableArrayListExtra(Intent.EXTRA_STREAM, uris)
+            // Grants on EXTRA_STREAM lists only reach the target through ClipData.
+            clipData = ClipData.newRawUri(null, uris.first()).apply { uris.drop(1).forEach { addItem(ClipData.Item(it)) } }
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         }
         return Intent.createChooser(send, null)

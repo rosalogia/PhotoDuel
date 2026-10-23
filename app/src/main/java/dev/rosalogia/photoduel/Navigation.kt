@@ -22,6 +22,8 @@ import dev.rosalogia.photoduel.feature.duel.DuelRoute
 import dev.rosalogia.photoduel.feature.duel.FeedRoute
 import dev.rosalogia.photoduel.feature.groups.GroupEditRoute
 import dev.rosalogia.photoduel.feature.groups.GroupsRoute
+import dev.rosalogia.photoduel.feature.highlights.HighlightSessionRoute
+import dev.rosalogia.photoduel.feature.highlights.HighlightsTab
 import dev.rosalogia.photoduel.permissions.PartialAccessBanner
 import dev.rosalogia.photoduel.settings.SettingsScreen
 import kotlinx.serialization.Serializable
@@ -30,6 +32,7 @@ import kotlinx.serialization.Serializable
 @Serializable data object GroupsKey : NavKey
 @Serializable data class DuelKey(val groupId: Long) : NavKey
 @Serializable data class EditGroupKey(val groupId: Long) : NavKey
+@Serializable data class HighlightKey(val setId: Long) : NavKey
 @Serializable data object SettingsKey : NavKey
 @Serializable data object LogsKey : NavKey
 
@@ -75,7 +78,11 @@ fun MainNavigation(partialAccess: Boolean, onRequestMoreAccess: () -> Unit) {
                         }
                     },
                     banner = { if (partialAccess) PartialAccessBanner(onGrantMore = onRequestMoreAccess) },
+                    highlights = { HighlightsTab(onOpenSet = { backStack.add(HighlightKey(it)) }) },
                 )
+            }
+            entry<HighlightKey> { key ->
+                HighlightSessionRoute(setId = key.setId, onClose = { backStack.pop(key) })
             }
             entry<DuelKey> { key ->
                 DuelRoute(groupId = key.groupId, onFinished = { backStack.pop(key) })
