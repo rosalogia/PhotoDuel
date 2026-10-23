@@ -2,6 +2,7 @@ package dev.rosalogia.photoduel.feature.duel
 
 import android.graphics.Matrix
 import android.graphics.Paint
+import android.graphics.RectF
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
@@ -19,6 +20,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.ImageBitmap
@@ -60,6 +62,13 @@ class ZoomState {
         offset = clamp(newOffset)
     }
 
+    /** Zooms to [targetScale] with [point] (view coordinates at fit) moved to the center. */
+    fun zoomTo(point: Offset, targetScale: Float) {
+        scale = targetScale.coerceIn(MIN_SCALE, MAX_SCALE)
+        val center = Offset(viewport.width / 2f, viewport.height / 2f)
+        offset = clamp(-(point - center) * scale)
+    }
+
     /** Toggles between fit and [targetScale] centered on [focus]. */
     fun toggle(focus: Offset, targetScale: Float = DOUBLE_TAP_SCALE) {
         if (isZoomed) reset() else transform(targetScale / scale, focus, Offset.Zero)
@@ -95,6 +104,8 @@ fun FlipView(
     king: ImageBitmap,
     challenger: ImageBitmap,
     alignment: Alignment?,
+    /** Normalized box in the king's frame; double-tap zooms here instead of to the tap point. */
+    focusFace: RectF?,
     showChallenger: Boolean,
     zoom: ZoomState,
     onPress: (Boolean) -> Unit,
@@ -109,9 +120,12 @@ fun FlipView(
     val swipe by rememberUpdatedState(onSwipe)
     val drag by rememberUpdatedState(onDrag)
     val lastTap = remember { LastTap() }
+    val face by rememberUpdatedState(focusFace)
+    val kingSize by rememberUpdatedState(IntSize(king.width, king.height))
 
     Box(
         modifier
+            .clipToBounds()
             .onSizeChanged { zoom.viewport = it }
             .testTag("flipView")
             .pointerInput(Unit) {
@@ -154,7 +168,12 @@ fun FlipView(
                     if (isTap) {
                         val now = down.uptimeMillis
                         if (now - lastTap.time < doubleTapTimeout && (down.position - lastTap.position).getDistance() < touchSlop * 4) {
-                            zoom.toggle(down.position)
+                            val f = face
+                            if (!zoom.isZoomed && f != null) {
+                                zoomToFace(zoom, f, kingSize)
+                            } else {
+                                zoom.toggle(down.position)
+                            }
                             lastTap.time = 0
                         } else {
                             lastTap.time = now
@@ -181,6 +200,17 @@ fun FlipView(
             drawIntoCanvas { it.nativeCanvas.drawBitmap(challenger.asAndroidBitmap(), matrix, bitmapPaint) }
         }
     }
+}
+
+/** Fills about half the view height with the face, centered. */
+private fun zoomToFace(zoom: ZoomState, face: RectF, image: IntSize) {
+    val view = zoom.viewport
+    val s = min(view.width.toFloat() / image.width, view.height.toFloat() / image.height)
+    val dx = (view.width - image.width * s) / 2
+    val dy = (view.height - image.height * s) / 2
+    val center = Offset(dx + face.centerX() * image.width * s, dy + face.centerY() * image.height * s)
+    val faceHeight = face.height() * image.height * s
+    zoom.zoomTo(center, (0.5f * view.height / faceHeight).coerceIn(1.5f, ZoomState.MAX_SCALE))
 }
 
 private val bitmapPaint = Paint(Paint.FILTER_BITMAP_FLAG or Paint.ANTI_ALIAS_FLAG)

@@ -14,6 +14,7 @@ import dagger.assisted.AssistedInject
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dev.rosalogia.photoduel.core.common.AppLog
 import dev.rosalogia.photoduel.core.data.LibraryIndexer
+import dev.rosalogia.photoduel.core.data.PreScoreRepository
 import dev.rosalogia.photoduel.core.data.db.PhotoDuelDatabase
 import dev.rosalogia.photoduel.core.data.grouping.toBytes
 import javax.inject.Inject
@@ -48,6 +49,7 @@ class FeatureIndexWorker @AssistedInject constructor(
     private val db: PhotoDuelDatabase,
     private val extractor: PhotoFeatureExtractor,
     private val indexer: LibraryIndexer,
+    private val preScores: PreScoreRepository,
 ) : CoroutineWorker(context, params) {
 
     override suspend fun doWork(): Result {
@@ -83,6 +85,20 @@ class FeatureIndexWorker @AssistedInject constructor(
         val secs = (System.currentTimeMillis() - started) / 1000.0
         AppLog.i(TAG, "Indexed $done photos ($failed failed) in ${"%.1f".format(secs)}s" +
             if (secs > 0) ", ${"%.1f".format(done / secs)}/s" else "")
+
+        // Then pre-score photos in to-do groups, so opening a duel doesn't have to wait for it.
+        var scored = 0
+        val scoreStart = System.currentTimeMillis()
+        while (!isStopped) {
+            val batch = dao.unscoredGroupMembers(BATCH)
+            if (batch.isEmpty()) break
+            for (id in batch) {
+                if (isStopped) break
+                preScores.compute(id)
+                scored++
+            }
+        }
+        if (scored > 0) AppLog.i(TAG, "Pre-scored $scored photos in ${System.currentTimeMillis() - scoreStart}ms")
         return Result.success()
     }
 

@@ -31,6 +31,8 @@ dependencies {
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)
     implementation(libs.mediapipe.tasks.vision)
+    implementation(libs.mlkit.face.detection)
+    api(libs.opencv)
 
     testImplementation(libs.junit)
     testImplementation(libs.truth)

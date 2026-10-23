@@ -1,7 +1,9 @@
 package dev.rosalogia.photoduel
 
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
@@ -16,11 +18,13 @@ import dev.rosalogia.photoduel.feature.duel.DuelRoute
 import dev.rosalogia.photoduel.feature.groups.GroupEditRoute
 import dev.rosalogia.photoduel.feature.groups.GroupsRoute
 import dev.rosalogia.photoduel.permissions.PartialAccessBanner
+import dev.rosalogia.photoduel.settings.SettingsScreen
 import kotlinx.serialization.Serializable
 
 @Serializable data object GroupsKey : NavKey
 @Serializable data class DuelKey(val groupId: Long) : NavKey
 @Serializable data class EditGroupKey(val groupId: Long) : NavKey
+@Serializable data object SettingsKey : NavKey
 @Serializable data object LogsKey : NavKey
 
 /** Pops [key] only if it's on top, so a screen asking to close twice can't pop its parent too. */
@@ -45,8 +49,8 @@ fun MainNavigation(partialAccess: Boolean, onRequestMoreAccess: () -> Unit) {
                     onOpenGroup = { backStack.add(DuelKey(it)) },
                     onEditGroup = { backStack.add(EditGroupKey(it)) },
                     topBarActions = {
-                        if (BuildConfig.SHOW_DEBUG_TOOLS) {
-                            TextButton(onClick = { backStack.add(LogsKey) }, modifier = Modifier.testTag("openLogs")) { Text("Logs") }
+                        IconButton(onClick = { backStack.add(SettingsKey) }, modifier = Modifier.testTag("openSettings")) {
+                            Icon(Icons.Filled.Settings, contentDescription = "Settings")
                         }
                     },
                     banner = { if (partialAccess) PartialAccessBanner(onGrantMore = onRequestMoreAccess) },
@@ -57,6 +61,9 @@ fun MainNavigation(partialAccess: Boolean, onRequestMoreAccess: () -> Unit) {
             }
             entry<EditGroupKey> { key ->
                 GroupEditRoute(groupId = key.groupId, onClose = { backStack.pop(key) })
+            }
+            entry<SettingsKey> {
+                SettingsScreen(onBack = { backStack.pop(SettingsKey) }, onOpenLogs = { backStack.add(LogsKey) })
             }
             entry<LogsKey> { DebugLogScreen() }
         },

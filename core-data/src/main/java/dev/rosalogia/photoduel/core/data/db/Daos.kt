@@ -65,7 +65,31 @@ interface PhotoDao {
 
     @Query("SELECT media_id, embedding, dhash, indexed_at FROM photo WHERE media_id IN (:ids)")
     suspend fun signals(ids: List<Long>): List<SignalRow>
+
+    @Query("SELECT media_id, pre_score FROM photo WHERE media_id IN (:ids)")
+    suspend fun preScores(ids: List<Long>): List<PreScoreRow>
+
+    @Query("UPDATE photo SET pre_score = :score WHERE media_id = :mediaId")
+    suspend fun setPreScore(mediaId: Long, score: Float)
+
+    /** Members of to-do groups that haven't been scored yet: the photos a duel will need next. */
+    @Query(
+        """
+        SELECT p.media_id FROM photo p
+        JOIN group_member m ON m.media_id = p.media_id
+        JOIN photo_group g ON g.group_id = m.group_id
+        WHERE p.pre_score IS NULL AND g.status = 'UNRESOLVED'
+        ORDER BY g.start_time DESC
+        LIMIT :limit
+        """,
+    )
+    suspend fun unscoredGroupMembers(limit: Int): List<Long>
 }
+
+data class PreScoreRow(
+    @ColumnInfo(name = "media_id") val mediaId: Long,
+    @ColumnInfo(name = "pre_score") val preScore: Float?,
+)
 
 @Dao
 interface GroupDao {

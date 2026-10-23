@@ -1,5 +1,6 @@
 package dev.rosalogia.photoduel.feature.duel
 
+import android.graphics.RectF
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -10,8 +11,10 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import dev.rosalogia.photoduel.core.common.AppLog
 import dev.rosalogia.photoduel.core.data.DuelRepository
 import dev.rosalogia.photoduel.core.data.GroupRepository
+import dev.rosalogia.photoduel.core.data.PreScoreRepository
 import dev.rosalogia.photoduel.core.data.PhotoGroup
 import dev.rosalogia.photoduel.core.data.db.GroupStatus
+import dev.rosalogia.photoduel.core.ml.FaceAnalyzer
 import dev.rosalogia.photoduel.feature.duel.align.Aligner
 import dev.rosalogia.photoduel.feature.duel.align.Alignment
 import dev.rosalogia.photoduel.feature.duel.engine.Decision
@@ -43,6 +46,8 @@ sealed interface DuelUiState {
         /** Null when alignment failed or was rejected: the challenger is then shown unaligned. */
         val alignment: Alignment?,
         val alignmentKnown: Boolean,
+        /** Largest face in the king, normalized; double-tap zooms to it. */
+        val kingFace: RectF?,
         val canUndo: Boolean,
     ) : DuelUiState {
         /** Both photos decoded and registered, so the first flip is already instant and steady. */
@@ -73,6 +78,8 @@ class DuelViewModel @AssistedInject constructor(
     private val duels: DuelRepository,
     private val loader: FullResLoader,
     private val aligner: Aligner,
+    private val preScores: PreScoreRepository,
+    private val faces: FaceAnalyzer,
 ) : ViewModel() {
     @AssistedFactory
     interface Factory {
@@ -100,6 +107,7 @@ class DuelViewModel @AssistedInject constructor(
     /** Alignment results per (king, challenger); a present key with a null value means "show unaligned". */
     private val alignments = HashMap<Pair<Long, Long>, Alignment?>()
     private val loading = HashSet<Matchup>()
+    private val largestFace = HashMap<Long, RectF?>()
 
     init {
         viewModelScope.launch { mutex.withLock { load() } }
@@ -128,7 +136,13 @@ class DuelViewModel @AssistedInject constructor(
             return
         }
 
-        val order = g.mediaIds
+        // Strongest candidates first, so they meet early. Scores are persisted, so this order is
+        // the same every time the group is opened, which replaying stored decisions relies on.
+        val scores = preScores.ensure(g.mediaIds)
+        val order = g.mediaIds.withIndex()
+            .sortedWith(compareByDescending<IndexedValue<Long>> { scores.getValue(it.value) }.thenBy { it.index })
+            .map { it.value }
+        AppLog.d(TAG, "Group $groupId order: " + order.joinToString { "$it(${"%.2f".format(scores.getValue(it))})" })
         val history = duels.active(groupId)
         val (mainDuel, usedMain) = KingOfTheHill.replay(order, history.map { Decision(it.winner, it.loser) })
         main = mainDuel
@@ -189,6 +203,7 @@ class DuelViewModel @AssistedInject constructor(
                 challenger = challenger,
                 alignment = alignments[key],
                 alignmentKnown = key in alignments,
+                kingFace = largestFace[matchup.king],
                 canUndo = duel.canUndo || round == Round.RUNNER_UP,
             )
             if (king == null || challenger == null || key !in alignments) loadImages(matchup, duel.nextChallenger)
@@ -226,6 +241,14 @@ class DuelViewModel @AssistedInject constructor(
                 alignments[matchup.king to matchup.challenger] = alignment
                 val s = _state.value
                 if (s is DuelUiState.Dueling && s.matchup == matchup) render()
+            }
+            if (matchup.king !in largestFace) {
+                val face = runCatching { faces.analyze(matchup.king).largestFace?.box }.getOrNull()
+                mutex.withLock {
+                    largestFace[matchup.king] = face
+                    val s = _state.value
+                    if (s is DuelUiState.Dueling && s.matchup.king == matchup.king) render()
+                }
             }
             // Whoever wins this step faces [next]; register both possibilities ahead of time.
             if (next != null) {

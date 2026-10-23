@@ -7,11 +7,11 @@ import android.util.LruCache
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dev.rosalogia.photoduel.core.common.AppLog
 import dev.rosalogia.photoduel.core.data.media.mediaContentUri
+import dev.rosalogia.photoduel.core.ml.OpenCv
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
-import org.opencv.android.OpenCVLoader
 import org.opencv.android.Utils
 import org.opencv.calib3d.Calib3d
 import org.opencv.core.Core
@@ -86,7 +86,7 @@ class Aligner @Inject constructor(
 
     /** For tests and callers that already hold bitmaps. */
     fun alignBitmaps(king: Bitmap, challenger: Bitmap): Alignment? {
-        ensureOpenCv()
+        OpenCv.ensureLoaded()
         val k = toGray(king)
         val c = toGray(challenger)
         return try {
@@ -99,7 +99,7 @@ class Aligner @Inject constructor(
 
     private fun gray(mediaId: Long): Mat {
         grayCache.get(mediaId)?.let { return it }
-        ensureOpenCv()
+        OpenCv.ensureLoaded()
         val source = ImageDecoder.createSource(context.contentResolver, mediaContentUri(mediaId))
         val bitmap = ImageDecoder.decodeBitmap(source) { decoder, info, _ ->
             val longEdge = max(info.size.width, info.size.height)
@@ -206,18 +206,6 @@ class Aligner @Inject constructor(
         const val RESULT_CACHE_ENTRIES = 32
         /** Corner displacement limit, as a fraction of the normalized image diagonal. */
         const val MAX_CORNER_SHIFT = 0.12
-
-        @Volatile private var openCvReady = false
-
-        fun ensureOpenCv() {
-            if (openCvReady) return
-            synchronized(this) {
-                if (!openCvReady) {
-                    check(OpenCVLoader.initLocal()) { "OpenCV failed to load" }
-                    openCvReady = true
-                }
-            }
-        }
 
         /** H_norm = diag(1/Wk, 1/Hk, 1) · H · diag(Wc, Hc, 1). */
         fun normalize(h: DoubleArray, wc: Int, hc: Int, wk: Int, hk: Int): DoubleArray {

@@ -37,6 +37,7 @@ class FlipViewTest {
                 king = ImageBitmap(400, 300),
                 challenger = ImageBitmap(400, 300),
                 alignment = null,
+                focusFace = null,
                 showChallenger = showChallenger,
                 zoom = zoom,
                 onPress = {

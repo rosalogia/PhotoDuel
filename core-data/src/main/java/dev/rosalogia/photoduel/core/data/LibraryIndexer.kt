@@ -53,6 +53,11 @@ class LibraryIndexer @Inject constructor(
     private val scheduler: IndexScheduler,
 ) {
     private val mutex = Mutex()
+    /**
+     * With partial access (Android 14+ "selected photos") MediaStore only returns what the user
+     * picked, so a missing photo may just be hidden. Then nothing is deleted and only these are grouped.
+     */
+    private var visibleOnly: Set<Long>? = null
     private val _state = MutableStateFlow<IndexState>(IndexState.Idle)
     val state: StateFlow<IndexState> = _state.asStateFlow()
 
@@ -74,7 +79,8 @@ class LibraryIndexer @Inject constructor(
             AppLog.e(TAG, "Sync failed", e)
             _state.value = IndexState.Failed(e.message ?: e.javaClass.simpleName)
         }
-        if (db.photoDao().unindexedCount() > 0) scheduler.schedule()
+        val dao = db.photoDao()
+        if (dao.unindexedCount() > 0 || dao.unscoredGroupMembers(1).isNotEmpty()) scheduler.schedule()
     }
 
     /**
@@ -91,6 +97,8 @@ class LibraryIndexer @Inject constructor(
 
     private suspend fun syncPhotosLocked() {
         val photos = media.queryCameraPhotos()
+        val partial = media.currentAccess() == MediaAccess.PARTIAL
+        visibleOnly = if (partial) photos.mapTo(HashSet()) { it.id } else null
         val photoDao = db.photoDao()
         val groupDao = db.groupDao()
         db.withTransaction {
@@ -112,12 +120,16 @@ class LibraryIndexer @Inject constructor(
                 )
             }
             val currentIds = photos.mapTo(HashSet()) { it.id }
-            val removed = existing.keys.filter { it !in currentIds }
+            val removed = if (partial) emptyList() else existing.keys.filter { it !in currentIds }
             removed.chunked(500).forEach {
                 photoDao.deleteByIds(it)
                 groupDao.deleteMembersByMedia(it)
             }
-            AppLog.d(TAG, "Photos: ${photos.size} total, ${changed.size} new/changed, ${removed.size} removed")
+            AppLog.d(
+                TAG,
+                "Photos: ${photos.size} visible, ${changed.size} new/changed, ${removed.size} removed" +
+                    if (partial) " (partial access: not removing hidden photos)" else "",
+            )
         }
     }
 
@@ -137,7 +149,10 @@ class LibraryIndexer @Inject constructor(
             val frozenIds = frozen.flatMapTo(HashSet()) { g -> g.members.map { it.mediaId } }
 
             val timeOf = photos.associate { it.mediaId to it.dateTaken }
-            val candidates = photos.filter { it.mediaId !in frozenIds }.map { TimedPhoto(it.mediaId, it.dateTaken) }
+            val visible = visibleOnly
+            val candidates = photos
+                .filter { it.mediaId !in frozenIds && (visible == null || it.mediaId in visible) }
+                .map { TimedPhoto(it.mediaId, it.dateTaken) }
             val sessions = splitIntoSessions(candidates, s.sessionGapMs).map { session -> session.map { it.mediaId } }
 
             val needSignals = sessions.filter { it.size >= 2 }.flatten()

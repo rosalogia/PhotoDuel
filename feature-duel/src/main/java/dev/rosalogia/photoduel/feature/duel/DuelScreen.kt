@@ -153,6 +153,7 @@ fun DuelScreen(
                     king = state.king!!,
                     challenger = state.challenger!!,
                     alignment = state.alignment,
+                    focusFace = state.kingFace,
                     showChallenger = showChallenger,
                     zoom = zoom,
                     onPress = ::setFlip,
