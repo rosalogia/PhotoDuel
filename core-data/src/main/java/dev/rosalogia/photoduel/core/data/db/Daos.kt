@@ -1,0 +1,115 @@
+package dev.rosalogia.photoduel.core.data.db
+
+import androidx.room.Dao
+import androidx.room.Embedded
+import androidx.room.Insert
+import androidx.room.OnConflictStrategy
+import androidx.room.Query
+import androidx.room.Relation
+import androidx.room.Transaction
+import androidx.room.Upsert
+import kotlinx.coroutines.flow.Flow
+
+data class GroupWithMembers(
+    @Embedded val group: PhotoGroupEntity,
+    @Relation(parentColumn = "group_id", entityColumn = "group_id")
+    val members: List<GroupMemberEntity>,
+) {
+    val orderedMediaIds: List<Long> get() = members.sortedBy { it.position }.map { it.mediaId }
+}
+
+@Dao
+interface PhotoDao {
+    @Query("SELECT * FROM photo")
+    suspend fun getAll(): List<PhotoEntity>
+
+    @Query("SELECT * FROM photo WHERE media_id IN (:ids)")
+    suspend fun getByIds(ids: List<Long>): List<PhotoEntity>
+
+    @Upsert
+    suspend fun upsertAll(photos: List<PhotoEntity>)
+
+    @Query("DELETE FROM photo WHERE media_id IN (:ids)")
+    suspend fun deleteByIds(ids: List<Long>)
+
+    @Query("SELECT COUNT(*) FROM photo")
+    fun observeCount(): Flow<Int>
+}
+
+@Dao
+interface GroupDao {
+    @Transaction
+    @Query(
+        """
+        SELECT * FROM photo_group
+        WHERE status = :status AND end_time >= :sinceMillis
+        ORDER BY start_time DESC
+        """,
+    )
+    fun observeGroups(status: GroupStatus, sinceMillis: Long): Flow<List<GroupWithMembers>>
+
+    @Transaction
+    @Query("SELECT * FROM photo_group WHERE group_id = :groupId")
+    fun observeGroup(groupId: Long): Flow<GroupWithMembers?>
+
+    @Transaction
+    @Query("SELECT * FROM photo_group WHERE group_id = :groupId")
+    suspend fun getGroup(groupId: Long): GroupWithMembers?
+
+    @Transaction
+    @Query("SELECT * FROM photo_group")
+    suspend fun getAllGroups(): List<GroupWithMembers>
+
+    @Query("SELECT COUNT(*) FROM photo_group WHERE status = :status")
+    fun observeCount(status: GroupStatus): Flow<Int>
+
+    @Insert
+    suspend fun insertGroup(group: PhotoGroupEntity): Long
+
+    @Query("UPDATE photo_group SET start_time = :start, end_time = :end WHERE group_id = :groupId")
+    suspend fun updateTimes(groupId: Long, start: Long, end: Long)
+
+    @Query(
+        """
+        UPDATE photo_group SET status = :status, winner_media_id = :winner, runner_up_media_id = :runnerUp
+        WHERE group_id = :groupId
+        """,
+    )
+    suspend fun setResult(groupId: Long, status: GroupStatus, winner: Long?, runnerUp: Long?)
+
+    @Query("DELETE FROM photo_group WHERE group_id IN (:ids)")
+    suspend fun deleteGroups(ids: List<Long>)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertMembers(members: List<GroupMemberEntity>)
+
+    @Query("DELETE FROM group_member WHERE group_id = :groupId")
+    suspend fun deleteMembersOf(groupId: Long)
+
+    @Query("DELETE FROM group_member WHERE media_id IN (:mediaIds)")
+    suspend fun deleteMembersByMedia(mediaIds: List<Long>)
+}
+
+@Dao
+interface OverrideDao {
+    @Query("SELECT * FROM group_override ORDER BY created_at, id")
+    suspend fun getAll(): List<GroupOverrideEntity>
+
+    @Insert
+    suspend fun insert(override: GroupOverrideEntity): Long
+}
+
+@Dao
+interface DuelDao {
+    @Insert
+    suspend fun insert(decision: DuelDecisionEntity): Long
+
+    @Query("UPDATE duel_decision SET undone = 1 WHERE id = :id")
+    suspend fun markUndone(id: Long)
+
+    @Query("SELECT * FROM duel_decision WHERE group_id = :groupId AND undone = 0 ORDER BY decided_at, id")
+    suspend fun activeDecisions(groupId: Long): List<DuelDecisionEntity>
+
+    @Query("UPDATE duel_decision SET undone = 1 WHERE group_id = :groupId")
+    suspend fun clearGroup(groupId: Long)
+}
