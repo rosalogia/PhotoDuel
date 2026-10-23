@@ -71,6 +71,21 @@ class FlipViewTest {
     }
 
     @Test
+    fun horizontalDragShowsThePhotoItWouldKeep() {
+        rule.onNodeWithTag("flipView").performTouchInput {
+            down(center)
+            moveBy(Offset(-150f, 0f))
+        }
+        rule.runOnIdle { assertThat(showChallenger).isFalse() }
+        rule.onNodeWithTag("flipView").performTouchInput { moveBy(Offset(300f, 0f)) }
+        rule.runOnIdle { assertThat(showChallenger).isTrue() }
+        rule.onNodeWithTag("flipView").performTouchInput { moveBy(Offset(-300f, 0f)) }
+        rule.runOnIdle { assertThat(showChallenger).isFalse() }
+        rule.onNodeWithTag("flipView").performTouchInput { up() }
+        rule.runOnIdle { assertThat(showChallenger).isFalse() }
+    }
+
+    @Test
     fun verticalDragIsLeftForTheParentAndStopsFlipping() {
         rule.onNodeWithTag("flipView").performTouchInput { swipeUp() }
         rule.runOnIdle {

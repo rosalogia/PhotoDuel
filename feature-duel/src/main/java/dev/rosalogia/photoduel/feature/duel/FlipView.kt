@@ -96,7 +96,8 @@ class ZoomState {
  * Shows [king], or [challenger] while [showChallenger] is true, in exactly the same place.
  *
  * Gestures, when not zoomed: touching the photo shows the challenger until release; a horizontal
- * swipe picks (right keeps the challenger, left keeps the king, matching the buttons). Vertical drags
+ * swipe picks (right keeps the challenger, left keeps the king, matching the buttons), showing the
+ * photo it would keep while the finger moves. Vertical drags
  * are left unconsumed for a parent, such as the feed's pager. Pinch zooms; when zoomed, one finger
  * pans and flipping is done with the hold button instead. Double-tap toggles zoom.
  */
@@ -167,6 +168,8 @@ fun FlipView(
                                     }
                                 }
                                 if (horizontal == true) {
+                                    // Show the photo this swipe would keep: right is the challenger, left the king.
+                                    if (flipping) press(total.x > 0)
                                     drag(total.x)
                                     event.changes.forEach { it.consume() }
                                 }
