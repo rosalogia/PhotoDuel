@@ -1,0 +1,250 @@
+package dev.rosalogia.photoduel.feature.duel
+
+import android.os.Build
+import android.widget.Toast
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.waitForUpOrCancellation
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawingPadding
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Surface
+import androidx.compose.material3.darkColorScheme
+import androidx.compose.material3.dynamicDarkColorScheme
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import kotlin.math.abs
+
+val KingColor = Color(0xFF4C8DF6)
+val ChallengerColor = Color(0xFFFF9F1C)
+
+@Composable
+fun DuelRoute(groupId: Long, onClose: () -> Unit) {
+    val viewModel = hiltViewModel<DuelViewModel, DuelViewModel.Factory>(key = "duel-$groupId") { it.create(groupId) }
+    val state by viewModel.state.collectAsStateWithLifecycle()
+    val context = LocalContext.current
+    LaunchedEffect(viewModel) {
+        viewModel.events.collect { e ->
+            when (e) {
+                is DuelEvent.Message -> Toast.makeText(context, e.text, Toast.LENGTH_SHORT).show()
+                DuelEvent.Close -> onClose()
+            }
+        }
+    }
+    // Photos read best on black, so the duel flow is always dark regardless of the system theme.
+    val dark = if (Build.VERSION.SDK_INT >= 31) dynamicDarkColorScheme(context) else darkColorScheme()
+    MaterialTheme(colorScheme = dark) {
+        Surface(color = Color.Black, contentColor = Color.White, modifier = Modifier.fillMaxSize()) {
+            when (val s = state) {
+                DuelUiState.Loading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
+                is DuelUiState.Error -> ErrorView(s.message, onClose)
+                is DuelUiState.Dueling -> DuelScreen(s, onBack = onClose, onPick = viewModel::pick, onUndo = viewModel::undo)
+                is DuelUiState.Result -> ResultScreen(
+                    state = s,
+                    onBack = onClose,
+                    onUndo = viewModel::undo,
+                    onPickRunnerUp = viewModel::pickRunnerUp,
+                    onDone = viewModel::markDone,
+                    onTrashed = viewModel::onTrashed,
+                    onFavorited = viewModel::onFavorited,
+                    onDuelAgain = viewModel::duelAgain,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ErrorView(message: String, onClose: () -> Unit) {
+    Column(
+        Modifier.fillMaxSize().safeDrawingPadding().padding(32.dp),
+        verticalArrangement = Arrangement.Center,
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Text(message, textAlign = TextAlign.Center)
+        TextButton(onClick = onClose) { Text("Back") }
+    }
+}
+
+@Composable
+fun DuelScreen(
+    state: DuelUiState.Dueling,
+    onBack: () -> Unit,
+    onPick: (keepChallenger: Boolean, flipCount: Int) -> Unit,
+    onUndo: () -> Unit,
+) {
+    val zoom = remember { ZoomState() }
+    var showChallenger by remember { mutableStateOf(false) }
+    // Per matchup: how many times the user flipped before deciding.
+    var flips by remember(state.matchup) { mutableIntStateOf(0) }
+    var dragY by remember { mutableFloatStateOf(0f) }
+    val swipeThreshold = with(LocalDensity.current) { 96.dp.toPx() }
+
+    fun setFlip(on: Boolean) {
+        if (on && !showChallenger) flips++
+        showChallenger = on
+    }
+
+    fun pick(keepChallenger: Boolean) {
+        showChallenger = false
+        dragY = 0f
+        onPick(keepChallenger, flips)
+    }
+
+    val edge = if (showChallenger) ChallengerColor else KingColor
+    Column(Modifier.fillMaxSize().safeDrawingPadding()) {
+        Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+            IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back") }
+            Text(
+                text = (if (state.round == Round.RUNNER_UP) "Runner-up · " else "") +
+                    "Pick ${state.matchup.step + 1} of ${state.matchup.totalSteps}",
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.weight(1f).testTag("duelProgress"),
+            )
+            TextButton(onClick = onUndo, enabled = state.canUndo, modifier = Modifier.testTag("undo")) { Text("Undo") }
+        }
+
+        Box(
+            Modifier.weight(1f).fillMaxWidth().padding(horizontal = 8.dp)
+                .border(3.dp, edge, RoundedCornerShape(6.dp))
+                .padding(3.dp),
+        ) {
+            if (state.ready) {
+                FlipView(
+                    king = state.king!!,
+                    challenger = state.challenger!!,
+                    showChallenger = showChallenger,
+                    zoom = zoom,
+                    onPress = ::setFlip,
+                    onSwipe = { up -> pick(keepChallenger = up) },
+                    onDrag = { dragY = it },
+                    modifier = Modifier.fillMaxSize().graphicsLayer { translationY = dragY * 0.4f },
+                )
+            } else {
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
+            }
+            Label(
+                text = if (showChallenger) "Challenger" else "Current pick",
+                color = edge,
+                modifier = Modifier.align(Alignment.TopCenter).padding(top = 12.dp).testTag("flipLabel"),
+            )
+            if (abs(dragY) > swipeThreshold * 0.3f) {
+                val up = dragY < 0
+                Label(
+                    text = if (up) "↑ Keep challenger" else "↓ Keep current pick",
+                    color = if (up) ChallengerColor else KingColor,
+                    modifier = Modifier.align(if (up) Alignment.BottomCenter else Alignment.Center).padding(bottom = 24.dp)
+                        .graphicsLayer { alpha = (abs(dragY) / swipeThreshold).coerceIn(0.3f, 1f) },
+                )
+            }
+        }
+
+        Row(
+            Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 12.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            OutlinedButton(
+                onClick = { pick(keepChallenger = false) },
+                enabled = state.ready,
+                modifier = Modifier.weight(1f).testTag("keepKing"),
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = KingColor),
+                contentPadding = PaddingValues(horizontal = 4.dp, vertical = 8.dp),
+            ) { Text("Keep\ncurrent", textAlign = TextAlign.Center, maxLines = 2, softWrap = false) }
+            HoldButton(
+                enabled = state.ready,
+                onPress = ::setFlip,
+                modifier = Modifier.weight(1.3f).height(64.dp).testTag("hold"),
+            )
+            OutlinedButton(
+                onClick = { pick(keepChallenger = true) },
+                enabled = state.ready,
+                modifier = Modifier.weight(1f).testTag("keepChallenger"),
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = ChallengerColor),
+                contentPadding = PaddingValues(horizontal = 4.dp, vertical = 8.dp),
+            ) { Text("Keep\nchallenger", textAlign = TextAlign.Center, maxLines = 2, softWrap = false) }
+        }
+    }
+}
+
+@Composable
+private fun Label(text: String, color: Color, modifier: Modifier = Modifier) {
+    Text(
+        text,
+        color = Color.White,
+        fontWeight = FontWeight.SemiBold,
+        style = MaterialTheme.typography.labelLarge,
+        modifier = modifier
+            .background(Color.Black.copy(alpha = 0.6f), RoundedCornerShape(50))
+            .border(2.dp, color, RoundedCornerShape(50))
+            .padding(horizontal = 14.dp, vertical = 6.dp),
+    )
+}
+
+/** A large button that shows the challenger for as long as it is held. */
+@Composable
+private fun HoldButton(enabled: Boolean, onPress: (Boolean) -> Unit, modifier: Modifier = Modifier) {
+    var held by remember { mutableStateOf(false) }
+    Box(
+        modifier
+            .background(if (held) ChallengerColor else Color.White.copy(alpha = if (enabled) 0.15f else 0.05f), RoundedCornerShape(32.dp))
+            .pointerInput(enabled) {
+                if (!enabled) return@pointerInput
+                awaitEachGesture {
+                    awaitFirstDown()
+                    held = true
+                    onPress(true)
+                    waitForUpOrCancellation()
+                    held = false
+                    onPress(false)
+                }
+            },
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            "Hold to compare",
+            color = if (held) Color.Black else Color.White,
+            fontWeight = FontWeight.SemiBold,
+            textAlign = TextAlign.Center,
+        )
+    }
+}

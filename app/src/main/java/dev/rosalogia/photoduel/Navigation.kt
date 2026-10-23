@@ -1,11 +1,8 @@
 package dev.rosalogia.photoduel
 
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.lifecycle.viewmodel.navigation3.rememberViewModelStoreNavEntryDecorator
@@ -15,6 +12,7 @@ import androidx.navigation3.runtime.rememberNavBackStack
 import androidx.navigation3.runtime.rememberSaveableStateHolderNavEntryDecorator
 import androidx.navigation3.ui.NavDisplay
 import dev.rosalogia.photoduel.debug.DebugLogScreen
+import dev.rosalogia.photoduel.feature.duel.DuelRoute
 import dev.rosalogia.photoduel.feature.groups.GroupsRoute
 import dev.rosalogia.photoduel.permissions.PartialAccessBanner
 import kotlinx.serialization.Serializable
@@ -47,7 +45,7 @@ fun MainNavigation(partialAccess: Boolean, onRequestMoreAccess: () -> Unit) {
                 )
             }
             entry<DuelKey> { key ->
-                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text("Duel for group ${key.groupId} (M2)") }
+                DuelRoute(groupId = key.groupId, onClose = { backStack.removeLastOrNull() })
             }
             entry<LogsKey> { DebugLogScreen() }
         },

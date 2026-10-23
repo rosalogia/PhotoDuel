@@ -48,6 +48,7 @@ dependencies {
     implementation(project(":core-common"))
     implementation(project(":core-data"))
     implementation(project(":feature-groups"))
+    implementation(project(":feature-duel"))
 
     val composeBom = platform(libs.androidx.compose.bom)
     implementation(composeBom)
