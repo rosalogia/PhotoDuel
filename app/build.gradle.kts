@@ -20,9 +20,21 @@ android {
     }
 
     buildTypes {
+        debug {
+            buildConfigField("boolean", "SHOW_DEBUG_TOOLS", "true")
+        }
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            buildConfigField("boolean", "SHOW_DEBUG_TOOLS", "false")
+        }
+        // What gets sideloaded onto a real phone for testing: shrunk and non-debuggable like a
+        // release (so performance is representative) but debug-signed, with the log viewer on.
+        create("preview") {
+            initWith(getByName("release"))
+            signingConfig = signingConfigs.getByName("debug")
+            matchingFallbacks += listOf("release")
+            buildConfigField("boolean", "SHOW_DEBUG_TOOLS", "true")
         }
     }
     compileOptions {
@@ -43,6 +55,8 @@ android {
         }
     }
     packaging {
+        // Compress native libs in the APK (OpenCV is ~25 MB uncompressed). Costs one extraction at install.
+        jniLibs.useLegacyPackaging = true
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
         }

@@ -57,7 +57,7 @@ class MainActivity : ComponentActivity() {
                     } else {
                         MainNavigation(partialAccess = access == MediaAccess.PARTIAL, onRequestMoreAccess = requestAccess)
                     }
-                    if (BuildConfig.DEBUG) CrashReportPrompt()
+                    if (BuildConfig.SHOW_DEBUG_TOOLS) CrashReportPrompt()
                 }
             }
         }

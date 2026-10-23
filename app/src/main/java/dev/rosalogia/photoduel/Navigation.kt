@@ -37,7 +37,7 @@ fun MainNavigation(partialAccess: Boolean, onRequestMoreAccess: () -> Unit) {
                 GroupsRoute(
                     onOpenGroup = { backStack.add(DuelKey(it)) },
                     topBarActions = {
-                        if (BuildConfig.DEBUG) {
+                        if (BuildConfig.SHOW_DEBUG_TOOLS) {
                             TextButton(onClick = { backStack.add(LogsKey) }, modifier = Modifier.testTag("openLogs")) { Text("Logs") }
                         }
                     },
