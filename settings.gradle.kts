@@ -33,5 +33,6 @@ rootProject.name = "PhotoDuel"
 include(":app")
 include(":core-common")
 include(":core-data")
+include(":core-ml")
 include(":feature-groups")
 include(":feature-duel")

@@ -1,5 +1,6 @@
 package dev.rosalogia.photoduel.core.data.db
 
+import androidx.room.ColumnInfo
 import androidx.room.Dao
 import androidx.room.Embedded
 import androidx.room.Insert
@@ -18,10 +19,24 @@ data class GroupWithMembers(
     val orderedMediaIds: List<Long> get() = members.sortedBy { it.position }.map { it.mediaId }
 }
 
+data class SignalRow(
+    @ColumnInfo(name = "media_id") val mediaId: Long,
+    val embedding: ByteArray?,
+    val dhash: Long?,
+    @ColumnInfo(name = "indexed_at") val indexedAt: Long?,
+)
+
+data class PhotoTimeRow(
+    @ColumnInfo(name = "media_id") val mediaId: Long,
+    @ColumnInfo(name = "date_taken") val dateTaken: Long,
+    @ColumnInfo(name = "date_modified") val dateModified: Long,
+)
+
 @Dao
 interface PhotoDao {
-    @Query("SELECT * FROM photo")
-    suspend fun getAll(): List<PhotoEntity>
+    /** Without the embedding blobs, which regrouping only needs for some photos. */
+    @Query("SELECT media_id, date_taken, date_modified FROM photo")
+    suspend fun getAllTimes(): List<PhotoTimeRow>
 
     @Query("SELECT * FROM photo WHERE media_id IN (:ids)")
     suspend fun getByIds(ids: List<Long>): List<PhotoEntity>
@@ -34,6 +49,22 @@ interface PhotoDao {
 
     @Query("SELECT COUNT(*) FROM photo")
     fun observeCount(): Flow<Int>
+
+    /** Newest first, so recent groups get visual clustering soonest. */
+    @Query("SELECT media_id FROM photo WHERE indexed_at IS NULL ORDER BY date_taken DESC LIMIT :limit")
+    suspend fun unindexedIds(limit: Int): List<Long>
+
+    @Query("SELECT COUNT(*) FROM photo WHERE indexed_at IS NULL")
+    fun observeUnindexedCount(): Flow<Int>
+
+    @Query("SELECT COUNT(*) FROM photo WHERE indexed_at IS NULL")
+    suspend fun unindexedCount(): Int
+
+    @Query("UPDATE photo SET embedding = :embedding, dhash = :dhash, indexed_at = :indexedAt WHERE media_id = :mediaId")
+    suspend fun setFeatures(mediaId: Long, embedding: ByteArray?, dhash: Long?, indexedAt: Long)
+
+    @Query("SELECT media_id, embedding, dhash, indexed_at FROM photo WHERE media_id IN (:ids)")
+    suspend fun signals(ids: List<Long>): List<SignalRow>
 }
 
 @Dao

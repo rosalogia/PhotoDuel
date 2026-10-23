@@ -30,6 +30,8 @@ data class GroupsUiState(
     val todo: List<PhotoGroup> = emptyList(),
     val done: List<PhotoGroup> = emptyList(),
     val indexing: Boolean = false,
+    /** Photos not yet analyzed for visual grouping. */
+    val analyzing: Int = 0,
     val loaded: Boolean = false,
 ) {
     val visible: List<PhotoGroup> get() = if (tab == GroupsTab.TODO) todo else done
@@ -54,13 +56,19 @@ class GroupsViewModel @Inject constructor(
         ) { todo, done -> Triple(allTime, todo, done) }
     }
 
-    val state: StateFlow<GroupsUiState> = combine(tab, lists, indexer.state) { tab, (allTime, todo, done), index ->
+    val state: StateFlow<GroupsUiState> = combine(
+        tab,
+        lists,
+        indexer.state,
+        groups.observeUnindexedCount(),
+    ) { tab, (allTime, todo, done), index, unindexed ->
         GroupsUiState(
             tab = tab,
             showAllTime = allTime,
             todo = todo,
             done = done,
             indexing = index == IndexState.Running,
+            analyzing = unindexed,
             loaded = true,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), GroupsUiState())

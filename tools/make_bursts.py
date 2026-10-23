@@ -76,8 +76,10 @@ def main() -> None:
     base_dir, out_dir = Path(sys.argv[1]), Path(sys.argv[2])
     camera = out_dir / "Camera"
     shots = out_dir / "Screenshots"
-    camera.mkdir(parents=True, exist_ok=True)
-    shots.mkdir(parents=True, exist_ok=True)
+    for d in (camera, shots):
+        d.mkdir(parents=True, exist_ok=True)
+        for old in d.glob("*.jpg"):  # file names embed the time, so stale runs would pile up
+            old.unlink()
     rng = random.Random(42)
     now = datetime.now(timezone.utc).replace(microsecond=0)
     expected = {"bursts": [], "singles": [], "excluded": []}

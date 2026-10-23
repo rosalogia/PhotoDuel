@@ -30,7 +30,9 @@ class IndexingCoordinator @Inject constructor(
     fun start(scope: CoroutineScope) {
         scope.launch {
             ProcessLifecycleOwner.get().lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
-                val settingsChanges = settings.settings.distinctUntilChangedBy { it.sessionGapMs }.drop(1)
+                val settingsChanges = settings.settings
+                    .distinctUntilChangedBy { it.sessionGapMs to it.similarityThreshold }
+                    .drop(1)
                 merge(media.changes(), settingsChanges)
                     .debounce(1_500)
                     .onStart { emit(Unit) }

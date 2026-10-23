@@ -7,9 +7,16 @@ import dev.rosalogia.photoduel.core.data.db.GroupStatus
 import dev.rosalogia.photoduel.core.data.db.PhotoDuelDatabase
 import dev.rosalogia.photoduel.core.data.db.PhotoEntity
 import dev.rosalogia.photoduel.core.data.db.PhotoGroupEntity
+import dev.rosalogia.photoduel.core.data.grouping.ClusterParams
+import dev.rosalogia.photoduel.core.data.grouping.PhotoSignal
 import dev.rosalogia.photoduel.core.data.grouping.TimedPhoto
+import dev.rosalogia.photoduel.core.data.grouping.applyOverrides
+import dev.rosalogia.photoduel.core.data.grouping.clusterSession
+import dev.rosalogia.photoduel.core.data.grouping.describeClustering
 import dev.rosalogia.photoduel.core.data.grouping.reconcileGroups
 import dev.rosalogia.photoduel.core.data.grouping.splitIntoSessions
+import dev.rosalogia.photoduel.core.data.grouping.toFloats
+import dev.rosalogia.photoduel.core.data.index.IndexScheduler
 import dev.rosalogia.photoduel.core.data.media.MediaAccess
 import dev.rosalogia.photoduel.core.data.media.MediaStoreRepository
 import dev.rosalogia.photoduel.core.data.settings.SettingsRepository
@@ -31,6 +38,9 @@ sealed interface IndexState {
 /**
  * Mirrors the camera roll into the `photo` table and rebuilds unresolved groups.
  *
+ * Grouping is deterministic given the photos, their features, the settings and the overrides:
+ * time sessions, then visual clusters within each session, then user overrides on top.
+ *
  * Groups that are DONE or DISMISSED are frozen: their photos are left out of re-grouping so a
  * finished group never reappears. Their members are only removed when the media is gone.
  */
@@ -39,11 +49,14 @@ class LibraryIndexer @Inject constructor(
     private val media: MediaStoreRepository,
     private val db: PhotoDuelDatabase,
     private val settings: SettingsRepository,
+    private val overrides: OverrideRepository,
+    private val scheduler: IndexScheduler,
 ) {
     private val mutex = Mutex()
     private val _state = MutableStateFlow<IndexState>(IndexState.Idle)
     val state: StateFlow<IndexState> = _state.asStateFlow()
 
+    /** Reads MediaStore, updates the photo table, regroups, and schedules feature extraction if needed. */
     suspend fun sync() = mutex.withLock {
         if (media.currentAccess() == MediaAccess.NONE) {
             AppLog.i(TAG, "No media access; skipping sync")
@@ -51,25 +64,40 @@ class LibraryIndexer @Inject constructor(
         }
         _state.value = IndexState.Running
         try {
-            val ms = measureTimeMillis { syncLocked() }
+            val ms = measureTimeMillis {
+                syncPhotosLocked()
+                regroupLocked()
+            }
             AppLog.i(TAG, "Sync finished in ${ms}ms")
             _state.value = IndexState.Idle
         } catch (e: Exception) {
             AppLog.e(TAG, "Sync failed", e)
             _state.value = IndexState.Failed(e.message ?: e.javaClass.simpleName)
         }
+        if (db.photoDao().unindexedCount() > 0) scheduler.schedule()
     }
 
-    private suspend fun syncLocked() {
+    /**
+     * Rebuilds groups from what's already in the database, e.g. after new features or a manual edit.
+     * With [logStats], logs a similarity summary per multi-photo session for threshold tuning.
+     */
+    suspend fun regroup(logStats: Boolean = false) = mutex.withLock {
+        try {
+            regroupLocked(logStats)
+        } catch (e: Exception) {
+            AppLog.e(TAG, "Regroup failed", e)
+        }
+    }
+
+    private suspend fun syncPhotosLocked() {
         val photos = media.queryCameraPhotos()
         val photoDao = db.photoDao()
         val groupDao = db.groupDao()
-        val gapMs = settings.current().sessionGapMs
-
         db.withTransaction {
-            val existing = photoDao.getAll().associateBy { it.mediaId }
-            val changed = photos.filter { p -> existing[p.id]?.dateModified != p.dateModified }
+            val existing = photoDao.getAllTimes().associate { it.mediaId to it.dateModified }
+            val changed = photos.filter { p -> existing[p.id] != p.dateModified }
             if (changed.isNotEmpty()) {
+                // A new or edited photo starts without features; the index worker fills them in.
                 photoDao.upsertAll(
                     changed.map {
                         PhotoEntity(
@@ -85,25 +113,49 @@ class LibraryIndexer @Inject constructor(
             }
             val currentIds = photos.mapTo(HashSet()) { it.id }
             val removed = existing.keys.filter { it !in currentIds }
-            if (removed.isNotEmpty()) {
-                removed.chunked(500).forEach {
-                    photoDao.deleteByIds(it)
-                    groupDao.deleteMembersByMedia(it)
-                }
+            removed.chunked(500).forEach {
+                photoDao.deleteByIds(it)
+                groupDao.deleteMembersByMedia(it)
             }
             AppLog.d(TAG, "Photos: ${photos.size} total, ${changed.size} new/changed, ${removed.size} removed")
+        }
+    }
 
+    private suspend fun regroupLocked(logStats: Boolean = false) {
+        val photoDao = db.photoDao()
+        val groupDao = db.groupDao()
+        val s = settings.current()
+        val params = ClusterParams(similarityThreshold = s.similarityThreshold)
+        val overrideList = overrides.all()
+
+        db.withTransaction {
+            val photos = photoDao.getAllTimes()
             val groups = groupDao.getAllGroups()
             val (frozen, unresolved) = groups.partition { it.group.status != GroupStatus.UNRESOLVED }
             val emptyFrozen = frozen.filter { it.members.isEmpty() }.map { it.group.groupId }
             if (emptyFrozen.isNotEmpty()) groupDao.deleteGroups(emptyFrozen)
             val frozenIds = frozen.flatMapTo(HashSet()) { g -> g.members.map { it.mediaId } }
 
-            val timeOf = photos.associate { it.id to it.dateTaken }
-            val candidates = photos.filter { it.id !in frozenIds }.map { TimedPhoto(it.id, it.dateTaken) }
-            val newGroups = splitIntoSessions(candidates, gapMs)
-                .filter { it.size >= 2 }
-                .map { session -> session.map { it.mediaId } }
+            val timeOf = photos.associate { it.mediaId to it.dateTaken }
+            val candidates = photos.filter { it.mediaId !in frozenIds }.map { TimedPhoto(it.mediaId, it.dateTaken) }
+            val sessions = splitIntoSessions(candidates, s.sessionGapMs).map { session -> session.map { it.mediaId } }
+
+            val needSignals = sessions.filter { it.size >= 2 }.flatten()
+            val signals = HashMap<Long, PhotoSignal>(needSignals.size)
+            needSignals.chunked(900).forEach { chunk ->
+                photoDao.signals(chunk).forEach { r ->
+                    signals[r.mediaId] = PhotoSignal(r.embedding?.toFloats(), r.dhash, indexed = r.indexedAt != null)
+                }
+            }
+            val perSession = sessions.map { clusterSession(it, signals, params) }
+            if (logStats) {
+                AppLog.i(TAG, "Clustering at threshold ${params.similarityThreshold}:")
+                perSession.filter { c -> c.sumOf { it.size } >= 2 }
+                    .forEach { AppLog.i(TAG, "  " + describeClustering(it, signals)) }
+            }
+            val clusters = perSession.flatten()
+            val order = sessions.flatten().withIndex().associate { (i, id) -> id to i }
+            val newGroups = applyOverrides(clusters, overrideList, order).filter { it.size >= 2 }
 
             val plan = reconcileGroups(
                 old = unresolved.associate { g -> g.group.groupId to g.members.mapTo(HashSet()) { it.mediaId } },
@@ -131,7 +183,8 @@ class LibraryIndexer @Inject constructor(
             }
             AppLog.d(
                 TAG,
-                "Groups: ${plan.keep.size} kept, ${plan.create.size} created, ${plan.delete.size} deleted, ${frozen.size} frozen",
+                "Groups: ${plan.keep.size} kept, ${plan.create.size} created, ${plan.delete.size} deleted, " +
+                    "${frozen.size} frozen; ${sessions.count { it.size >= 2 }} multi-photo sessions, ${overrideList.size} overrides",
             )
         }
     }

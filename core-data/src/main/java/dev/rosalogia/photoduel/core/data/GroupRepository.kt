@@ -39,6 +39,9 @@ class GroupRepository @Inject constructor(
     fun observeGroup(groupId: Long): Flow<PhotoGroup?> =
         db.groupDao().observeGroup(groupId).map { it?.toModel() }
 
+    /** Photos still waiting for visual features; their sessions are grouped by time only for now. */
+    fun observeUnindexedCount(): Flow<Int> = db.photoDao().observeUnindexedCount()
+
     suspend fun getGroup(groupId: Long): PhotoGroup? = db.groupDao().getGroup(groupId)?.toModel()
 
     suspend fun setResult(groupId: Long, status: GroupStatus, winner: Long?, runnerUp: Long?) =

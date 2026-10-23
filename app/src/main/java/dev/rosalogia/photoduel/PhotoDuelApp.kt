@@ -2,6 +2,8 @@ package dev.rosalogia.photoduel
 
 import android.app.Application
 import android.os.Build
+import androidx.hilt.work.HiltWorkerFactory
+import androidx.work.Configuration
 import dagger.hilt.android.HiltAndroidApp
 import dev.rosalogia.photoduel.core.common.AppLog
 import dev.rosalogia.photoduel.core.data.IndexingCoordinator
@@ -11,8 +13,12 @@ import kotlinx.coroutines.SupervisorJob
 import javax.inject.Inject
 
 @HiltAndroidApp
-class PhotoDuelApp : Application() {
+class PhotoDuelApp : Application(), Configuration.Provider {
     @Inject lateinit var indexing: IndexingCoordinator
+    @Inject lateinit var workerFactory: HiltWorkerFactory
+
+    override val workManagerConfiguration: Configuration
+        get() = Configuration.Builder().setWorkerFactory(workerFactory).build()
 
     /** Lives as long as the process; for work that must outlive any one screen. */
     val appScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)

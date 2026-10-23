@@ -70,6 +70,7 @@ kotlin {
 dependencies {
     implementation(project(":core-common"))
     implementation(project(":core-data"))
+    implementation(project(":core-ml"))
     implementation(project(":feature-groups"))
     implementation(project(":feature-duel"))
 
@@ -93,6 +94,8 @@ dependencies {
     ksp(libs.hilt.compiler)
     implementation(libs.androidx.hilt.lifecycle.viewmodel.compose)
     implementation(libs.coil.compose)
+    implementation(libs.work.runtime)
+    implementation(libs.androidx.hilt.work)
 
     debugImplementation(libs.androidx.compose.ui.tooling)
     debugImplementation(libs.androidx.compose.ui.test.manifest)

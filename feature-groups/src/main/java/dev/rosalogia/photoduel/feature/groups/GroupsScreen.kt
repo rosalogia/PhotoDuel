@@ -13,16 +13,19 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.PrimaryTabRow
@@ -52,6 +55,7 @@ private const val MAX_THUMBS = 4
 @Composable
 fun GroupsRoute(
     onOpenGroup: (Long) -> Unit,
+    onEditGroup: (Long) -> Unit,
     topBarActions: @Composable () -> Unit = {},
     banner: @Composable () -> Unit = {},
     viewModel: GroupsViewModel = hiltViewModel(),
@@ -62,6 +66,7 @@ fun GroupsRoute(
         onTab = viewModel::selectTab,
         onShowAllTime = viewModel::setShowAllTime,
         onOpenGroup = onOpenGroup,
+        onEditGroup = onEditGroup,
         topBarActions = topBarActions,
         banner = banner,
     )
@@ -74,6 +79,7 @@ fun GroupsScreen(
     onTab: (GroupsTab) -> Unit,
     onShowAllTime: (Boolean) -> Unit,
     onOpenGroup: (Long) -> Unit,
+    onEditGroup: (Long) -> Unit,
     topBarActions: @Composable () -> Unit = {},
     banner: @Composable () -> Unit = {},
 ) {
@@ -104,10 +110,18 @@ fun GroupsScreen(
                         text = { Text("Done (${state.done.size})") },
                     )
                 }
-                if (state.indexing) {
+                if (state.indexing || state.analyzing > 0) {
                     LinearProgressIndicator(Modifier.fillMaxWidth().testTag("indexing"))
                 } else {
                     Spacer(Modifier.height(4.dp))
+                }
+                if (state.analyzing > 0) {
+                    Text(
+                        "Analyzing photos… ${state.analyzing} left. Groups may still change.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp).testTag("analyzing"),
+                    )
                 }
             }
         },
@@ -123,7 +137,11 @@ fun GroupsScreen(
                     modifier = Modifier.fillMaxSize().testTag("groupList"),
                 ) {
                     items(state.visible, key = { it.id }) { group ->
-                        GroupCard(group, onClick = { onOpenGroup(group.id) })
+                        GroupCard(
+                            group,
+                            onClick = { onOpenGroup(group.id) },
+                            onEdit = if (state.tab == GroupsTab.TODO) ({ onEditGroup(group.id) }) else null,
+                        )
                     }
                 }
             }
@@ -145,7 +163,7 @@ private fun EmptyState(state: GroupsUiState) {
 }
 
 @Composable
-private fun GroupCard(group: PhotoGroup, onClick: () -> Unit) {
+private fun GroupCard(group: PhotoGroup, onClick: () -> Unit, onEdit: (() -> Unit)?) {
     // Resolved groups lead with their winner.
     val ordered = group.winnerMediaId?.let { w -> listOf(w) + (group.mediaIds - w) } ?: group.mediaIds
     val shown = ordered.take(MAX_THUMBS)
@@ -189,7 +207,13 @@ private fun GroupCard(group: PhotoGroup, onClick: () -> Unit) {
                     formatGroupTime(group.startTime),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.weight(1f),
                 )
+                if (onEdit != null) {
+                    IconButton(onClick = onEdit, modifier = Modifier.size(32.dp).testTag("editGroup")) {
+                        Icon(Icons.Filled.Edit, contentDescription = "Edit group", modifier = Modifier.size(18.dp))
+                    }
+                }
             }
         }
     }

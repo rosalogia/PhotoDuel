@@ -13,13 +13,20 @@ import androidx.navigation3.runtime.rememberSaveableStateHolderNavEntryDecorator
 import androidx.navigation3.ui.NavDisplay
 import dev.rosalogia.photoduel.debug.DebugLogScreen
 import dev.rosalogia.photoduel.feature.duel.DuelRoute
+import dev.rosalogia.photoduel.feature.groups.GroupEditRoute
 import dev.rosalogia.photoduel.feature.groups.GroupsRoute
 import dev.rosalogia.photoduel.permissions.PartialAccessBanner
 import kotlinx.serialization.Serializable
 
 @Serializable data object GroupsKey : NavKey
 @Serializable data class DuelKey(val groupId: Long) : NavKey
+@Serializable data class EditGroupKey(val groupId: Long) : NavKey
 @Serializable data object LogsKey : NavKey
+
+/** Pops [key] only if it's on top, so a screen asking to close twice can't pop its parent too. */
+private fun MutableList<NavKey>.pop(key: NavKey) {
+    if (lastOrNull() == key) removeAt(lastIndex)
+}
 
 @Composable
 fun MainNavigation(partialAccess: Boolean, onRequestMoreAccess: () -> Unit) {
@@ -36,6 +43,7 @@ fun MainNavigation(partialAccess: Boolean, onRequestMoreAccess: () -> Unit) {
             entry<GroupsKey> {
                 GroupsRoute(
                     onOpenGroup = { backStack.add(DuelKey(it)) },
+                    onEditGroup = { backStack.add(EditGroupKey(it)) },
                     topBarActions = {
                         if (BuildConfig.SHOW_DEBUG_TOOLS) {
                             TextButton(onClick = { backStack.add(LogsKey) }, modifier = Modifier.testTag("openLogs")) { Text("Logs") }
@@ -45,7 +53,10 @@ fun MainNavigation(partialAccess: Boolean, onRequestMoreAccess: () -> Unit) {
                 )
             }
             entry<DuelKey> { key ->
-                DuelRoute(groupId = key.groupId, onClose = { backStack.removeLastOrNull() })
+                DuelRoute(groupId = key.groupId, onClose = { backStack.pop(key) })
+            }
+            entry<EditGroupKey> { key ->
+                GroupEditRoute(groupId = key.groupId, onClose = { backStack.pop(key) })
             }
             entry<LogsKey> { DebugLogScreen() }
         },
