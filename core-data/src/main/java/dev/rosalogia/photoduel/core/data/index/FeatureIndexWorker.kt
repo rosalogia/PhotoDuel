@@ -17,6 +17,7 @@ import dev.rosalogia.photoduel.core.data.LibraryIndexer
 import dev.rosalogia.photoduel.core.data.PreScoreRepository
 import dev.rosalogia.photoduel.core.data.db.PhotoDuelDatabase
 import dev.rosalogia.photoduel.core.data.grouping.toBytes
+import kotlinx.coroutines.CancellationException
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -52,7 +53,17 @@ class FeatureIndexWorker @AssistedInject constructor(
     private val preScores: PreScoreRepository,
 ) : CoroutineWorker(context, params) {
 
-    override suspend fun doWork(): Result {
+    override suspend fun doWork(): Result = try {
+        index()
+    } catch (e: Throwable) {
+        // Errors (e.g. a native library failing to initialize) end the run without marking photos
+        // as failed, so they stay time-grouped and get retried next time. Log so it reaches shared logs.
+        if (e is CancellationException) throw e
+        AppLog.e(TAG, "Indexing run failed", e)
+        Result.failure()
+    }
+
+    private suspend fun index(): Result {
         val dao = db.photoDao()
         var done = 0
         var failed = 0

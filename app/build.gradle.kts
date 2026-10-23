@@ -54,9 +54,15 @@ android {
             isUniversalApk = false
         }
     }
+    androidResources {
+        // ML Kit bundles its face-contour model; contour mode is never enabled.
+        ignoreAssetsPatterns += "contours.tfl"
+    }
     packaging {
-        // Compress native libs in the APK (OpenCV is ~25 MB uncompressed). Costs one extraction at install.
+        // Compress native libs and dex in the APK (OpenCV alone is ~25 MB uncompressed), keeping the
+        // sideloaded APK small. Costs one extraction at install.
         jniLibs.useLegacyPackaging = true
+        dex.useLegacyPackaging = true
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
         }
