@@ -19,6 +19,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.Card
@@ -54,6 +55,8 @@ private const val MAX_THUMBS = 4
 
 @Composable
 fun GroupsRoute(
+    onBack: () -> Unit,
+    onOpenTodoGroup: (Long) -> Unit,
     onOpenGroup: (Long) -> Unit,
     onEditGroup: (Long) -> Unit,
     topBarActions: @Composable () -> Unit = {},
@@ -65,6 +68,8 @@ fun GroupsRoute(
         state = state,
         onTab = viewModel::selectTab,
         onShowAllTime = viewModel::setShowAllTime,
+        onBack = onBack,
+        onOpenTodoGroup = onOpenTodoGroup,
         onOpenGroup = onOpenGroup,
         onEditGroup = onEditGroup,
         topBarActions = topBarActions,
@@ -78,6 +83,9 @@ fun GroupsScreen(
     state: GroupsUiState,
     onTab: (GroupsTab) -> Unit,
     onShowAllTime: (Boolean) -> Unit,
+    onBack: () -> Unit,
+    /** A to-do group opens in the feed; a done one opens on its own. */
+    onOpenTodoGroup: (Long) -> Unit,
     onOpenGroup: (Long) -> Unit,
     onEditGroup: (Long) -> Unit,
     topBarActions: @Composable () -> Unit = {},
@@ -87,7 +95,12 @@ fun GroupsScreen(
         topBar = {
             Column {
                 TopAppBar(
-                    title = { Text("Photo Duel") },
+                    title = { Text("All groups") },
+                    navigationIcon = {
+                        IconButton(onClick = onBack, modifier = Modifier.testTag("listBack")) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back to feed")
+                        }
+                    },
                     actions = {
                         FilterChip(
                             selected = state.showAllTime,
@@ -139,7 +152,7 @@ fun GroupsScreen(
                     items(state.visible, key = { it.id }) { group ->
                         GroupCard(
                             group,
-                            onClick = { onOpenGroup(group.id) },
+                            onClick = { if (state.tab == GroupsTab.TODO) onOpenTodoGroup(group.id) else onOpenGroup(group.id) },
                             onEdit = if (state.tab == GroupsTab.TODO) ({ onEditGroup(group.id) }) else null,
                         )
                     }

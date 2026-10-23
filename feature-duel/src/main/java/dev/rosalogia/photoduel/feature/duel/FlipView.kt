@@ -95,8 +95,9 @@ class ZoomState {
 /**
  * Shows [king], or [challenger] while [showChallenger] is true, in exactly the same place.
  *
- * Gestures, when not zoomed: touching the photo shows the challenger until release; a vertical
- * swipe picks (up keeps the challenger, down keeps the king). Pinch zooms; when zoomed, one finger
+ * Gestures, when not zoomed: touching the photo shows the challenger until release; a horizontal
+ * swipe picks (right keeps the challenger, left keeps the king, matching the buttons). Vertical drags
+ * are left unconsumed for a parent, such as the feed's pager. Pinch zooms; when zoomed, one finger
  * pans and flipping is done with the hold button instead. Double-tap toggles zoom.
  */
 @Composable
@@ -109,7 +110,7 @@ fun FlipView(
     showChallenger: Boolean,
     zoom: ZoomState,
     onPress: (Boolean) -> Unit,
-    onSwipe: (up: Boolean) -> Unit,
+    onSwipe: (keepChallenger: Boolean) -> Unit,
     onDrag: (Float) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -136,6 +137,8 @@ fun FlipView(
                     if (flipping) press(true)
                     var multiTouch = false
                     var total = Offset.Zero
+                    // Decided once the finger passes touch slop: horizontal picks, vertical goes to the parent.
+                    var horizontal: Boolean? = null
                     while (true) {
                         val event = awaitPointerEvent()
                         val pressed = event.changes.count { it.pressed }
@@ -154,10 +157,20 @@ fun FlipView(
                             total += pan
                             if (zoom.isZoomed) {
                                 zoom.transform(1f, Offset.Zero, pan)
+                                event.changes.forEach { it.consume() }
                             } else if (!zoomedAtStart) {
-                                drag(total.y)
+                                if (horizontal == null && total.getDistance() > touchSlop) {
+                                    horizontal = abs(total.x) > abs(total.y)
+                                    if (horizontal == false && flipping) {
+                                        press(false)
+                                        flipping = false
+                                    }
+                                }
+                                if (horizontal == true) {
+                                    drag(total.x)
+                                    event.changes.forEach { it.consume() }
+                                }
                             }
-                            event.changes.forEach { it.consume() }
                         }
                     }
                     if (flipping) press(false)
@@ -179,8 +192,8 @@ fun FlipView(
                             lastTap.time = now
                             lastTap.position = down.position
                         }
-                    } else if (!zoomedAtStart && abs(total.y) > swipeThreshold && abs(total.y) > 1.5f * abs(total.x)) {
-                        swipe(total.y < 0)
+                    } else if (horizontal == true && abs(total.x) > swipeThreshold && abs(total.x) > 1.5f * abs(total.y)) {
+                        swipe(total.x > 0)
                     }
                 }
             },

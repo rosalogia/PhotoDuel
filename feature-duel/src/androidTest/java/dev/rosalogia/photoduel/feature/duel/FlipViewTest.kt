@@ -12,7 +12,8 @@ import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.pinch
-import androidx.compose.ui.test.swipeDown
+import androidx.compose.ui.test.swipeLeft
+import androidx.compose.ui.test.swipeRight
 import androidx.compose.ui.test.swipeUp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
@@ -63,10 +64,20 @@ class FlipViewTest {
     }
 
     @Test
-    fun swipeUpKeepsChallenger_swipeDownKeepsKing() {
-        rule.onNodeWithTag("flipView").performTouchInput { swipeUp() }
-        rule.onNodeWithTag("flipView").performTouchInput { swipeDown() }
+    fun swipeRightKeepsChallenger_swipeLeftKeepsKing() {
+        rule.onNodeWithTag("flipView").performTouchInput { swipeRight() }
+        rule.onNodeWithTag("flipView").performTouchInput { swipeLeft() }
         rule.runOnIdle { assertThat(swipes).containsExactly(true, false).inOrder() }
+    }
+
+    @Test
+    fun verticalDragIsLeftForTheParentAndStopsFlipping() {
+        rule.onNodeWithTag("flipView").performTouchInput { swipeUp() }
+        rule.runOnIdle {
+            assertThat(swipes).isEmpty()
+            assertThat(showChallenger).isFalse()
+            assertThat(pressEvents).containsExactly(true, false).inOrder()
+        }
     }
 
     @Test

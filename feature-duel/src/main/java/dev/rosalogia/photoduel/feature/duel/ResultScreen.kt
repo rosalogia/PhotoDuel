@@ -19,14 +19,12 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
@@ -59,7 +57,8 @@ interface LibraryActionsEntryPoint {
 @Composable
 fun ResultScreen(
     state: DuelUiState.Result,
-    onBack: () -> Unit,
+    navigation: DuelNavigation,
+    subtitle: String?,
     onUndo: () -> Unit,
     onPickRunnerUp: () -> Unit,
     onDone: () -> Unit,
@@ -81,13 +80,12 @@ fun ResultScreen(
     val finished = state.status != GroupStatus.UNRESOLVED
 
     Column(Modifier.fillMaxSize().safeDrawingPadding()) {
-        Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-            IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back") }
-            Text(
-                if (finished) "Your pick" else "Winner",
-                style = MaterialTheme.typography.titleMedium,
-                modifier = Modifier.weight(1f).testTag("resultTitle"),
-            )
+        DuelTopBar(
+            title = if (finished) "Your pick" else "Winner",
+            subtitle = subtitle,
+            navigation = navigation,
+            titleTag = "resultTitle",
+        ) {
             if (state.canUndo) TextButton(onClick = onUndo, modifier = Modifier.testTag("undo")) { Text("Undo") }
         }
 
