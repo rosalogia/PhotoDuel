@@ -12,6 +12,8 @@ import dev.rosalogia.photoduel.core.data.DuelRepository
 import dev.rosalogia.photoduel.core.data.GroupRepository
 import dev.rosalogia.photoduel.core.data.PhotoGroup
 import dev.rosalogia.photoduel.core.data.db.GroupStatus
+import dev.rosalogia.photoduel.feature.duel.align.Aligner
+import dev.rosalogia.photoduel.feature.duel.align.Alignment
 import dev.rosalogia.photoduel.feature.duel.engine.Decision
 import dev.rosalogia.photoduel.feature.duel.engine.KingOfTheHill
 import dev.rosalogia.photoduel.feature.duel.engine.Matchup
@@ -38,9 +40,13 @@ sealed interface DuelUiState {
         val matchup: Matchup,
         val king: ImageBitmap?,
         val challenger: ImageBitmap?,
+        /** Null when alignment failed or was rejected: the challenger is then shown unaligned. */
+        val alignment: Alignment?,
+        val alignmentKnown: Boolean,
         val canUndo: Boolean,
     ) : DuelUiState {
-        val ready: Boolean get() = king != null && challenger != null
+        /** Both photos decoded and registered, so the first flip is already instant and steady. */
+        val ready: Boolean get() = king != null && challenger != null && alignmentKnown
     }
 
     data class Result(
@@ -66,6 +72,7 @@ class DuelViewModel @AssistedInject constructor(
     private val groups: GroupRepository,
     private val duels: DuelRepository,
     private val loader: FullResLoader,
+    private val aligner: Aligner,
 ) : ViewModel() {
     @AssistedFactory
     interface Factory {
@@ -89,6 +96,10 @@ class DuelViewModel @AssistedInject constructor(
     /** IDs of stored decisions: main round first, then runner-up round. */
     private val decisionIds = ArrayList<Long>()
     private var stored: PhotoGroup? = null
+
+    /** Alignment results per (king, challenger); a present key with a null value means "show unaligned". */
+    private val alignments = HashMap<Pair<Long, Long>, Alignment?>()
+    private val loading = HashSet<Matchup>()
 
     init {
         viewModelScope.launch { mutex.withLock { load() } }
@@ -170,8 +181,17 @@ class DuelViewModel @AssistedInject constructor(
             val matchup = duel.current!!
             val king = loader.peek(matchup.king)
             val challenger = loader.peek(matchup.challenger)
-            _state.value = DuelUiState.Dueling(round, matchup, king, challenger, canUndo = duel.canUndo || round == Round.RUNNER_UP)
-            if (king == null || challenger == null) loadImages(matchup)
+            val key = matchup.king to matchup.challenger
+            _state.value = DuelUiState.Dueling(
+                round = round,
+                matchup = matchup,
+                king = king,
+                challenger = challenger,
+                alignment = alignments[key],
+                alignmentKnown = key in alignments,
+                canUndo = duel.canUndo || round == Round.RUNNER_UP,
+            )
+            if (king == null || challenger == null || key !in alignments) loadImages(matchup, duel.nextChallenger)
             duel.nextChallenger?.let(loader::prefetch)
             return
         }
@@ -188,19 +208,31 @@ class DuelViewModel @AssistedInject constructor(
         )
     }
 
-    private fun loadImages(matchup: Matchup) {
+    private fun loadImages(matchup: Matchup, next: Long?) {
+        if (!loading.add(matchup)) return
         viewModelScope.launch {
-            try {
+            val alignment = try {
                 loader.load(matchup.king)
                 loader.load(matchup.challenger)
+                aligner.align(matchup.king, matchup.challenger)
             } catch (e: Exception) {
                 AppLog.e(TAG, "Failed to load photos for $matchup", e)
                 _state.value = DuelUiState.Error("Couldn't open one of these photos. It may have been deleted.")
                 return@launch
+            } finally {
+                loading.remove(matchup)
             }
             mutex.withLock {
+                alignments[matchup.king to matchup.challenger] = alignment
                 val s = _state.value
                 if (s is DuelUiState.Dueling && s.matchup == matchup) render()
+            }
+            // Whoever wins this step faces [next]; register both possibilities ahead of time.
+            if (next != null) {
+                for (king in listOf(matchup.king, matchup.challenger)) {
+                    val a = aligner.align(king, next)
+                    mutex.withLock { alignments[king to next] = a }
+                }
             }
         }
     }

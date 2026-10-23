@@ -33,6 +33,15 @@ android {
         compose = true
         buildConfig = true
     }
+    // One APK per ABI: OpenCV's native libraries are large. arm64 for phones, x86_64 for the emulator.
+    splits {
+        abi {
+            isEnable = true
+            reset()
+            include("arm64-v8a", "x86_64")
+            isUniversalApk = false
+        }
+    }
     packaging {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"

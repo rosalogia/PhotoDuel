@@ -152,6 +152,7 @@ fun DuelScreen(
                 FlipView(
                     king = state.king!!,
                     challenger = state.challenger!!,
+                    alignment = state.alignment,
                     showChallenger = showChallenger,
                     zoom = zoom,
                     onPress = ::setFlip,

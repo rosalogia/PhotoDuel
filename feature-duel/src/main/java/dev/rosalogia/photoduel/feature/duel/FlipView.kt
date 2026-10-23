@@ -1,6 +1,8 @@
 package dev.rosalogia.photoduel.feature.duel
 
-import androidx.compose.foundation.Image
+import android.graphics.Matrix
+import android.graphics.Paint
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.calculateCentroid
@@ -18,17 +20,22 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asAndroidBitmap
+import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
+import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalViewConfiguration
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
+import dev.rosalogia.photoduel.feature.duel.align.Alignment
 import kotlin.math.abs
+import kotlin.math.min
 
 /** Zoom and pan shared by both photos, so flipping keeps the same spot on screen. */
 @Stable
@@ -87,6 +94,7 @@ class ZoomState {
 fun FlipView(
     king: ImageBitmap,
     challenger: ImageBitmap,
+    alignment: Alignment?,
     showChallenger: Boolean,
     zoom: ZoomState,
     onPress: (Boolean) -> Unit,
@@ -165,12 +173,38 @@ fun FlipView(
             translationY = zoom.offset.y
         }
         // Both stay composed; only alpha changes, so a flip never re-decodes or re-uploads.
-        Image(king, contentDescription = "Current pick", contentScale = ContentScale.Fit,
-            modifier = layer.graphicsLayer { alpha = if (showChallenger) 0f else 1f })
-        Image(challenger, contentDescription = "Challenger", contentScale = ContentScale.Fit,
-            modifier = layer.graphicsLayer { alpha = if (showChallenger) 1f else 0f })
+        Canvas(layer.graphicsLayer { alpha = if (showChallenger) 0f else 1f }) {
+            drawIntoCanvas { it.nativeCanvas.drawBitmap(king.asAndroidBitmap(), fitMatrix(king, size), bitmapPaint) }
+        }
+        Canvas(layer.graphicsLayer { alpha = if (showChallenger) 1f else 0f }) {
+            val matrix = if (alignment != null) alignedMatrix(challenger, king, alignment, size) else fitMatrix(challenger, size)
+            drawIntoCanvas { it.nativeCanvas.drawBitmap(challenger.asAndroidBitmap(), matrix, bitmapPaint) }
+        }
     }
 }
+
+private val bitmapPaint = Paint(Paint.FILTER_BITMAP_FLAG or Paint.ANTI_ALIAS_FLAG)
+
+/** Scales [image] to fit [size], centered, like ContentScale.Fit. */
+private fun fitMatrix(image: ImageBitmap, size: Size): Matrix {
+    val s = min(size.width / image.width, size.height / image.height)
+    return Matrix().apply {
+        setScale(s, s)
+        postTranslate((size.width - image.width * s) / 2, (size.height - image.height * s) / 2)
+    }
+}
+
+/**
+ * Challenger bitmap px -> normalized challenger -> (homography) normalized king -> king bitmap px
+ * -> view, so the challenger lands exactly over the king. The GPU applies the warp at draw time.
+ */
+private fun alignedMatrix(challenger: ImageBitmap, king: ImageBitmap, alignment: Alignment, size: Size): Matrix =
+    Matrix().apply {
+        setValues(FloatArray(9) { alignment.h[it].toFloat() })
+        preScale(1f / challenger.width, 1f / challenger.height)
+        postScale(king.width.toFloat(), king.height.toFloat())
+        postConcat(fitMatrix(king, size))
+    }
 
 private class LastTap {
     var time = 0L
