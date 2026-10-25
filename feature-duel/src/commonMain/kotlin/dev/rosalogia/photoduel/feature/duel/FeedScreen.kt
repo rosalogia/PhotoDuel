@@ -39,9 +39,8 @@ import androidx.lifecycle.ViewModelStore
 import androidx.lifecycle.ViewModelStoreOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.LocalViewModelStoreOwner
+import dev.rosalogia.photoduel.core.common.friendlyTime
 import dev.rosalogia.photoduel.core.ui.graphViewModel
-import java.text.DateFormat
-import java.util.Date
 
 /**
  * The main screen: to-do groups as a vertical feed, one duel per page. Swipe up or down to move
@@ -91,7 +90,8 @@ fun FeedRoute(
                                 // A finished group leaves the to-do list, so the pager moves on by itself.
                                 onFinished = {},
                                 navigation = listNavigation,
-                                subtitle = "${page + 1} of ${groups.size} · ${formatTime(group.startTime)}",
+                                title = friendlyTime(group.startTime),
+                                position = "${page + 1} of ${groups.size}",
                             )
                         }
                     }
@@ -146,5 +146,3 @@ private class PageViewModelStoreOwner : ViewModelStoreOwner {
     override val viewModelStore = ViewModelStore()
 }
 
-private fun formatTime(millis: Long): String =
-    DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT).format(Date(millis))

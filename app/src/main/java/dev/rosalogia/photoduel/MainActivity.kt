@@ -8,7 +8,6 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.platform.LocalContext
@@ -32,6 +31,7 @@ import dev.rosalogia.photoduel.core.data.media.MediaAccess
 import dev.rosalogia.photoduel.debug.CrashReportPrompt
 import dev.rosalogia.photoduel.permissions.PermissionScreen
 import dev.rosalogia.photoduel.permissions.rememberMediaPermissionLauncher
+import dev.rosalogia.photoduel.core.ui.BrandColors
 import dev.rosalogia.photoduel.theme.PhotoDuelTheme
 
 class MainActivity : ComponentActivity() {
@@ -43,7 +43,7 @@ class MainActivity : ComponentActivity() {
         val indexing = app.graph.data.coordinator
         setContent {
             val context = LocalContext.current
-            val dark = if (Build.VERSION.SDK_INT >= 31) dynamicDarkColorScheme(context) else darkColorScheme()
+            val dark = if (Build.VERSION.SDK_INT >= 31) dynamicDarkColorScheme(context) else BrandColors.dark
             CompositionLocalProvider(
                 LocalAppGraph provides app.graph,
                 LocalPhotoActions provides rememberAndroidPhotoActions(),

@@ -44,7 +44,12 @@ fun SettingsScreen(onBack: () -> Unit, onOpenLogs: () -> Unit) {
                 Spacer(Modifier.height(24.dp))
                 HorizontalDivider()
                 Spacer(Modifier.height(16.dp))
-                Text("Testing", style = MaterialTheme.typography.titleMedium)
+                Text("Troubleshooting", style = MaterialTheme.typography.titleMedium)
+                Text(
+                    "If something looks wrong, the logs help figure out why. They stay on this phone unless you share them.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
                 Spacer(Modifier.height(8.dp))
                 OutlinedButton(onClick = onOpenLogs, modifier = Modifier.testTag("openLogs")) { Text("View and share logs") }
             }

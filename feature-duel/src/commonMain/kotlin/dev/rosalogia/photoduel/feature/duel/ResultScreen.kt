@@ -13,6 +13,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
@@ -28,6 +30,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.Key
@@ -113,6 +116,8 @@ fun ResultScreen(
             }
         }
 
+        if (trashCount > 0) Others(state.rest)
+
         Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedButton(
@@ -148,7 +153,10 @@ fun ResultScreen(
             if (trashCount > 0) {
                 Button(
                     onClick = ::trashRest,
-                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.error,
+                        contentColor = MaterialTheme.colorScheme.onError,
+                    ),
                     modifier = Modifier.fillMaxWidth().testTag("trashRest"),
                 ) {
                     Icon(Icons.Filled.Delete, contentDescription = null)
@@ -162,6 +170,29 @@ fun ResultScreen(
                 TextButton(onClick = onDone, modifier = Modifier.fillMaxWidth().testTag("done")) { Text("Keep all and mark done" + if (keys) "  (Enter)" else "") }
             }
             Spacer(Modifier.height(4.dp))
+        }
+    }
+}
+
+/** The rest of the group, small and dimmed, so it's clear what "Trash the other N" would remove. */
+@Composable
+private fun Others(ids: List<Long>) {
+    Column(Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 12.dp)) {
+        Text(
+            "The other ${ids.size}",
+            style = MaterialTheme.typography.labelMedium,
+            color = Color.White.copy(alpha = 0.7f),
+        )
+        Spacer(Modifier.height(6.dp))
+        LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.testTag("others")) {
+            items(ids) { id ->
+                AsyncImage(
+                    model = PhotoRef(id),
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.size(56.dp).clip(RoundedCornerShape(6.dp)).alpha(0.6f),
+                )
+            }
         }
     }
 }

@@ -80,6 +80,13 @@ fun SettingsScreen(app: DesktopApp) {
             Spacer(Modifier.height(24.dp))
             HorizontalDivider()
             Spacer(Modifier.height(16.dp))
+            Text("Troubleshooting", style = MaterialTheme.typography.titleMedium)
+            Text(
+                "If something looks wrong, the logs help figure out why. They stay on this computer unless you share them.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(Modifier.height(8.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedButton(onClick = { SystemFiles.open(File(AppDirs.data, "logs")) }) { Text("Open logs folder") }
             }

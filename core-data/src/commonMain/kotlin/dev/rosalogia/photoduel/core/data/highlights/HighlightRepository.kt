@@ -29,7 +29,19 @@ class HighlightRepository(
     private val dao get() = db.highlightDao()
 
     fun observeSuggestions(): Flow<List<SeriesSuggestion>> =
-        db.photoDao().observeCount().distinctUntilChanged().map { SeriesSuggester.suggest(dao.allPhotoTimes(), ZoneId.systemDefault()) }
+        db.photoDao().observeCount().distinctUntilChanged().map {
+            val zone = ZoneId.systemDefault()
+            SeriesSuggester.suggest(dao.allPhotoTimes(), zone).map { it.copy(preview = preview(it, zone)) }
+        }
+
+    private suspend fun preview(s: SeriesSuggestion, zone: ZoneId): List<Long> {
+        val (from, to) = SeriesSuggester.range(s.start, s.end, zone)
+        return dao.photosInRange(from, to)
+            .sortedByDescending { it.preScore ?: 0f }
+            .take(PREVIEW)
+            .sortedBy { it.dateTaken }
+            .map { it.mediaId }
+    }
 
     fun observeSets(): Flow<List<HighlightSetSummary>> = dao.observeSets()
 
@@ -98,6 +110,7 @@ class HighlightRepository(
     }
 
     private companion object {
+        const val PREVIEW = 3
         const val CHUNK = 500
     }
 }

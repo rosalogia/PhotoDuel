@@ -44,14 +44,13 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.LocalViewModelStoreOwner
 import coil3.compose.AsyncImage
+import dev.rosalogia.photoduel.core.common.friendlyTime
 import dev.rosalogia.photoduel.core.data.PhotoGroup
 import dev.rosalogia.photoduel.core.ui.KeyShortcuts
 import dev.rosalogia.photoduel.core.ui.PhotoRef
 import dev.rosalogia.photoduel.core.ui.graphViewModel
 import dev.rosalogia.photoduel.feature.duel.DuelRoute
 import dev.rosalogia.photoduel.feature.duel.FeedViewModel
-import java.text.DateFormat
-import java.util.Date
 
 /**
  * The desktop take on the phone's feed: to-do groups in a list on the left, the selected group's
@@ -99,7 +98,8 @@ fun SortScreen(selected: Long?, onSelect: (Long?) -> Unit, onOpenLibrary: () -> 
                             groupId = group.id,
                             onFinished = {},
                             navigation = null,
-                            subtitle = "${index + 1} of ${groups.size} · ${formatTime(group.startTime)}",
+                            title = friendlyTime(group.startTime),
+                            position = "${index + 1} of ${groups.size}",
                         )
                     }
                 }
@@ -155,7 +155,7 @@ private fun GroupRow(group: PhotoGroup, selected: Boolean, onClick: () -> Unit) 
         }
         Spacer(Modifier.height(6.dp))
         Text(
-            "${group.mediaIds.size} photos · ${formatTime(group.startTime)}",
+            "${group.mediaIds.size} photos · ${friendlyTime(group.startTime)}",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -183,5 +183,3 @@ private fun EmptySort(showAllTime: Boolean, busy: Boolean, onShowAllTime: () -> 
     }
 }
 
-private fun formatTime(millis: Long): String =
-    DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT).format(Date(millis))

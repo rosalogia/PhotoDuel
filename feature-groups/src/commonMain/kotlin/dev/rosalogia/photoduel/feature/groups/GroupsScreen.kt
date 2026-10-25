@@ -46,11 +46,10 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
+import dev.rosalogia.photoduel.core.common.friendlyTime
 import dev.rosalogia.photoduel.core.data.PhotoGroup
 import dev.rosalogia.photoduel.core.ui.PhotoRef
 import dev.rosalogia.photoduel.core.ui.graphViewModel
-import java.text.DateFormat
-import java.util.Date
 
 private const val MAX_THUMBS = 4
 
@@ -239,7 +238,7 @@ private fun GroupCard(group: PhotoGroup, onClick: () -> Unit, onEdit: (() -> Uni
                 Text("${group.mediaIds.size} photos", style = MaterialTheme.typography.titleSmall)
                 Spacer(Modifier.width(8.dp))
                 Text(
-                    formatGroupTime(group.startTime),
+                    friendlyTime(group.startTime),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.weight(1f),
@@ -264,5 +263,3 @@ fun Thumbnail(mediaId: Long, modifier: Modifier = Modifier) {
     )
 }
 
-private fun formatGroupTime(millis: Long): String =
-    DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT).format(Date(millis))

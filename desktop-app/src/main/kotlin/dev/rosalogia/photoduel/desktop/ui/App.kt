@@ -23,8 +23,6 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.VerticalDivider
-import androidx.compose.material3.darkColorScheme
-import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
@@ -37,7 +35,6 @@ import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.isShiftPressed
@@ -48,6 +45,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.LocalViewModelStoreOwner
 import coil3.ImageLoader
 import coil3.compose.setSingletonImageLoaderFactory
+import dev.rosalogia.photoduel.core.ui.BrandColors
 import dev.rosalogia.photoduel.core.ui.KeyShortcuts
 import dev.rosalogia.photoduel.core.ui.LocalAppGraph
 import dev.rosalogia.photoduel.core.ui.LocalDarkColors
@@ -65,8 +63,6 @@ import dev.rosalogia.photoduel.feature.highlights.HighlightSessionRoute
 import dev.rosalogia.photoduel.feature.highlights.HighlightsTab
 import kotlinx.coroutines.launch
 
-private val Accent = Color(0xFF8AB4F8)
-
 @Composable
 fun App(app: DesktopApp, shortcuts: ShortcutDispatcher) {
     setSingletonImageLoaderFactory { context ->
@@ -81,11 +77,12 @@ fun App(app: DesktopApp, shortcuts: ShortcutDispatcher) {
         LocalShortcuts provides shortcuts,
         LocalPhotoActions provides app.actions,
         LocalMessages provides { text: String -> scope.launch { snackbar.showSnackbar(text) } },
-        LocalDarkColors provides darkColorScheme(primary = Accent),
+        LocalDarkColors provides BrandColors.dark,
         LocalViewModelStoreOwner provides remember { rootStores.owner("root") },
     ) {
-        MaterialTheme(colorScheme = if (dark) darkColorScheme(primary = Accent) else lightColorScheme()) {
-            Scaffold(snackbarHost = { SnackbarHost(snackbar) }) { padding ->
+        MaterialTheme(colorScheme = if (dark) BrandColors.dark else BrandColors.light) {
+            // Raised clear of the duel and highlight buttons along the bottom.
+            Scaffold(snackbarHost = { SnackbarHost(snackbar, Modifier.padding(bottom = 88.dp)) }) { padding ->
                 Box(Modifier.padding(padding).fillMaxSize()) {
                     val folders by app.folders.folders.collectAsStateWithLifecycle()
                     if (folders.isEmpty()) Onboarding(app) else Shell(app)

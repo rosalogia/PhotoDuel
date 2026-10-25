@@ -50,7 +50,11 @@ class HighlightsHomeViewModel(
     val created: Flow<Long> = _created.receiveAsFlow()
 
     val state: StateFlow<HighlightsHomeState> = combine(repo.observeSets(), repo.observeSuggestions(), draft) { sets, suggestions, d ->
-        HighlightsHomeState(sets, suggestions, d, loaded = true)
+        // A suggestion already made into a set isn't worth offering again.
+        val zone = ZoneId.systemDefault()
+        val made = sets.mapTo(HashSet()) { it.set.startTime to it.set.endTime }
+        val fresh = suggestions.filter { SeriesSuggester.range(it.start, it.end, zone) !in made }
+        HighlightsHomeState(sets, fresh, d, loaded = true)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), HighlightsHomeState())
 
     fun openDraft(start: LocalDate, end: LocalDate) {

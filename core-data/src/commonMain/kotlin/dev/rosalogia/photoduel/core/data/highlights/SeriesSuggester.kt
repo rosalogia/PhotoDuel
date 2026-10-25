@@ -12,6 +12,8 @@ data class SeriesSuggestion(
     val start: LocalDate,
     val end: LocalDate,
     val photoCount: Int,
+    /** A few of its best-scored photos, in time order, for a preview. */
+    val preview: List<Long> = emptyList(),
 )
 
 /**

@@ -4,7 +4,8 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -54,6 +55,7 @@ import androidx.compose.ui.input.key.isMetaPressed
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.util.VelocityTracker
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
@@ -72,6 +74,7 @@ import dev.rosalogia.photoduel.core.ui.PhotoRef
 import dev.rosalogia.photoduel.core.ui.graphViewModel
 import dev.rosalogia.photoduel.core.ui.hasShortcuts
 import kotlin.math.abs
+import kotlin.math.hypot
 import kotlinx.coroutines.launch
 
 private val KeepColor = Color(0xFF4CC38A)
@@ -202,8 +205,13 @@ private fun CullScreen(state: HighlightUiState.Cull, onClose: () -> Unit, onDeci
     // Reset per photo, so the next card starts centered.
     val offset = remember(state.current.mediaId) { Animatable(0f) }
     var width by remember { mutableStateOf(1000f) }
+    val fling = with(LocalDensity.current) { 800.dp.toPx() }
+    // One decision per photo, even if a button is tapped again while the card flies off.
+    var deciding by remember(state.current.mediaId) { mutableStateOf(false) }
 
     fun decide(keep: Boolean) {
+        if (deciding) return
+        deciding = true
         scope.launch {
             offset.animateTo(if (keep) width * 1.2f else -width * 1.2f)
             onDecide(keep)
@@ -238,14 +246,34 @@ private fun CullScreen(state: HighlightUiState.Cull, onClose: () -> Unit, onDeci
                     }
                     .background(Color.Black)
                     .pointerInput(state.current.mediaId) {
-                        detectHorizontalDragGestures(
-                            onDragEnd = {
-                                if (abs(offset.value) > threshold) decide(offset.value > 0) else scope.launch { offset.animateTo(0f) }
-                            },
-                            onDragCancel = { scope.launch { offset.animateTo(0f) } },
-                        ) { change, dx ->
-                            change.consume()
-                            scope.launch { offset.snapTo(offset.value + dx) }
+                        // Measured from where the finger went down to where it lifts, so a quick
+                        // flick counts in full even when few move events arrive in between.
+                        awaitEachGesture {
+                            val down = awaitFirstDown()
+                            val velocity = VelocityTracker().apply { addPosition(down.uptimeMillis, down.position) }
+                            val start = offset.value
+                            var horizontal: Boolean? = null
+                            while (true) {
+                                val change = awaitPointerEvent().changes.firstOrNull { it.id == down.id } ?: break
+                                velocity.addPosition(change.uptimeMillis, change.position)
+                                val dx = change.position.x - down.position.x
+                                val dy = change.position.y - down.position.y
+                                if (horizontal == null && hypot(dx, dy) > viewConfiguration.touchSlop) horizontal = abs(dx) > abs(dy)
+                                if (horizontal == true) {
+                                    change.consume()
+                                    scope.launch { offset.snapTo(start + dx) }
+                                }
+                                if (!change.pressed) {
+                                    if (horizontal == true) {
+                                        val v = velocity.calculateVelocity().x
+                                        val flung = abs(v) > fling && abs(dx) > threshold * 0.25f && (v > 0) == (dx > 0)
+                                        if (abs(dx) > threshold || flung) decide(dx > 0)
+                                    }
+                                    break
+                                }
+                            }
+                            // Not far or fast enough, or cancelled: spring back.
+                            if (horizontal == true && !deciding) scope.launch { offset.animateTo(0f) }
                         }
                     },
             )
@@ -428,7 +456,7 @@ private fun ResultScreen(
     Column(Modifier.fillMaxSize().safeDrawingPadding()) {
         TopBar(
             title = state.name,
-            subtitle = "${ids.size} highlights · ${formatRange(state.startTime, state.endTime)}",
+            subtitle = "${ids.size} highlights" + formatRange(state.startTime, state.endTime).let { if (it == state.name) "" else " · $it" },
             onClose = onClose,
             undo = onUndo,
             titleTag = "resultTitle",

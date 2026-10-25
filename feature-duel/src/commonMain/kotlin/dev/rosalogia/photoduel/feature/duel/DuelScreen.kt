@@ -52,6 +52,8 @@ import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -74,8 +76,8 @@ data class DuelNavigation(
 )
 
 /**
- * One group's duel. [onFinished] runs when the group is done or dissolved; [subtitle] is an extra
- * line under the progress, such as the feed position.
+ * One group's duel. [onFinished] runs when the group is done or dissolved. [title] names the group,
+ * such as when it was taken; [position] is where it sits in a list, such as "3 of 9".
  */
 @Composable
 fun DuelRoute(
@@ -83,7 +85,8 @@ fun DuelRoute(
     onFinished: () -> Unit,
     /** Null hides the top-left button, e.g. on desktop where a sidebar does that job. */
     navigation: DuelNavigation? = DuelNavigation(onClick = onFinished),
-    subtitle: String? = null,
+    title: String? = null,
+    position: String? = null,
 ) {
     val viewModel = graphViewModel(key = "duel-$groupId") { DuelViewModel.create(groupId, it) }
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -104,7 +107,8 @@ fun DuelRoute(
             is DuelUiState.Dueling -> DuelScreen(
                 s,
                 navigation = navigation,
-                subtitle = subtitle,
+                title = title,
+                position = position,
                 onPick = viewModel::pick,
                 onUndo = viewModel::undo,
                 onKeepBoth = viewModel::keepBoth,
@@ -112,7 +116,7 @@ fun DuelRoute(
             is DuelUiState.Result -> ResultScreen(
                 state = s,
                 navigation = navigation,
-                subtitle = subtitle,
+                subtitle = listOfNotNull(title, position?.let { "group $it" }).joinToString(" · ").ifEmpty { null },
                 onUndo = viewModel::undo,
                 onPickRunnerUp = viewModel::pickRunnerUp,
                 onDone = viewModel::markDone,
@@ -180,7 +184,8 @@ private fun ErrorView(message: String, navigation: DuelNavigation?) {
 fun DuelScreen(
     state: DuelUiState.Dueling,
     navigation: DuelNavigation?,
-    subtitle: String?,
+    title: String?,
+    position: String?,
     onPick: (keepChallenger: Boolean, flipCount: Int) -> Unit,
     onUndo: () -> Unit,
     onKeepBoth: () -> Unit,
@@ -226,18 +231,26 @@ fun DuelScreen(
 
     val edge = if (showChallenger) ChallengerColor else KingColor
     Column(Modifier.fillMaxSize().safeDrawingPadding()) {
+        val photos = state.matchup.totalSteps + 1
         DuelTopBar(
-            title = (if (state.round == Round.RUNNER_UP) "Runner-up · " else "") +
-                "Pick ${state.matchup.step + 1} of ${state.matchup.totalSteps}",
-            subtitle = subtitle,
+            title = if (state.round == Round.RUNNER_UP) "Pick a runner-up" else title ?: "Pick the better shot",
+            subtitle = listOfNotNull(
+                if (state.round == Round.MAIN) "$photos photos" else title,
+                position?.let { "group $it" },
+            ).joinToString(" · "),
             navigation = navigation,
-            titleTag = "duelProgress",
+            titleTag = "duelTitle",
         ) {
             if (state.round == Round.MAIN) {
                 TextButton(onClick = onKeepBoth, enabled = state.ready, modifier = Modifier.testTag("keepBoth")) { Text("Keep both") }
             }
             TextButton(onClick = onUndo, enabled = state.canUndo, modifier = Modifier.testTag("undo")) { Text("Undo") }
         }
+        StepProgress(
+            step = state.matchup.step,
+            total = state.matchup.totalSteps,
+            modifier = Modifier.fillMaxWidth().padding(start = 12.dp, end = 12.dp, top = 2.dp, bottom = 8.dp).testTag("duelProgress"),
+        )
 
         Box(
             Modifier.weight(1f).fillMaxWidth().padding(horizontal = 8.dp)
@@ -302,6 +315,24 @@ fun DuelScreen(
                 colors = ButtonDefaults.outlinedButtonColors(contentColor = ChallengerColor),
                 contentPadding = PaddingValues(horizontal = 4.dp, vertical = 8.dp),
             ) { Text(if (keys) "Keep →\nchallenger" else "Keep\nchallenger", textAlign = TextAlign.Center, maxLines = 2, softWrap = false) }
+        }
+    }
+}
+
+/** One segment per decision in this group: done ones filled, the current one lit, so "how much is left" reads at a glance. */
+@Composable
+private fun StepProgress(step: Int, total: Int, modifier: Modifier = Modifier) {
+    Row(
+        modifier.semantics { contentDescription = "Pick ${step + 1} of $total" },
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        repeat(total) { i ->
+            val color = when {
+                i < step -> Color.White.copy(alpha = 0.7f)
+                i == step -> KingColor
+                else -> Color.White.copy(alpha = 0.18f)
+            }
+            Box(Modifier.weight(1f).height(4.dp).background(color, RoundedCornerShape(2.dp)))
         }
     }
 }

@@ -1,5 +1,6 @@
 package dev.rosalogia.photoduel.feature.highlights
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -10,8 +11,10 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Delete
@@ -40,18 +43,22 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import coil3.compose.AsyncImage
 import dev.rosalogia.photoduel.core.data.db.HighlightPhase
 import dev.rosalogia.photoduel.core.data.db.HighlightSetSummary
 import dev.rosalogia.photoduel.core.data.highlights.SeriesKind
 import dev.rosalogia.photoduel.core.data.highlights.SeriesSuggestion
+import dev.rosalogia.photoduel.core.ui.PhotoRef
 import dev.rosalogia.photoduel.core.ui.graphViewModel
+import kotlin.math.roundToInt
 import java.time.Instant
 import java.time.ZoneOffset
 import java.time.temporal.ChronoUnit
-import kotlin.math.roundToInt
 
 /** The Highlights tab: sets in progress or done, suggested days and trips, and a date picker. */
 @Composable
@@ -161,13 +168,27 @@ private fun SuggestionCard(s: SeriesSuggestion, onClick: () -> Unit) {
         Modifier.fillMaxWidth().clickable(onClick = onClick).testTag("suggestion"),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
     ) {
-        Column(Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
-            Text(formatDays(s.start, s.end), style = MaterialTheme.typography.titleMedium)
-            Text(
-                (if (s.kind == SeriesKind.TRIP) "Trip · $days days · " else "") + "${s.photoCount} photos",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+        Row(Modifier.padding(horizontal = 16.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text(formatDays(s.start, s.end), style = MaterialTheme.typography.titleMedium)
+                Text(
+                    (if (s.kind == SeriesKind.TRIP) "Trip · $days days · " else "") + "${s.photoCount} photos",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            // A glimpse of the day, so it's recognizable without remembering the date.
+            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                s.preview.forEach { id ->
+                    AsyncImage(
+                        model = PhotoRef(id),
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.size(40.dp).clip(RoundedCornerShape(6.dp))
+                            .background(MaterialTheme.colorScheme.surfaceVariant),
+                    )
+                }
+            }
         }
     }
 }
