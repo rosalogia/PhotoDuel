@@ -8,11 +8,13 @@ import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -50,6 +52,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.isCtrlPressed
+import androidx.compose.ui.input.key.isMetaPressed
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
@@ -61,11 +69,13 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
 import dev.rosalogia.photoduel.core.common.AppLog
+import dev.rosalogia.photoduel.core.ui.KeyShortcuts
 import dev.rosalogia.photoduel.core.ui.LocalDarkColors
 import dev.rosalogia.photoduel.core.ui.LocalMessages
 import dev.rosalogia.photoduel.core.ui.LocalPhotoActions
 import dev.rosalogia.photoduel.core.ui.PhotoRef
 import dev.rosalogia.photoduel.core.ui.graphViewModel
+import dev.rosalogia.photoduel.core.ui.hasShortcuts
 import kotlin.math.abs
 import kotlinx.coroutines.launch
 
@@ -204,6 +214,15 @@ private fun CullScreen(state: HighlightUiState.Cull, onClose: () -> Unit, onDeci
             onDecide(keep)
         }
     }
+    KeyShortcuts { e ->
+        if (e.type != KeyEventType.KeyDown) return@KeyShortcuts false
+        when {
+            e.key == Key.DirectionRight -> true.also { decide(true) }
+            e.key == Key.DirectionLeft -> true.also { decide(false) }
+            e.isUndo() -> true.also { if (state.canUndo) onUndo() }
+            else -> false
+        }
+    }
 
     Column(Modifier.fillMaxSize().safeDrawingPadding()) {
         TopBar(
@@ -288,7 +307,7 @@ private fun PassDoneScreen(
             )
         }
         LazyVerticalGrid(
-            columns = GridCells.Fixed(4),
+            columns = GridCells.Adaptive(minSize = 96.dp),
             contentPadding = PaddingValues(12.dp),
             horizontalArrangement = Arrangement.spacedBy(4.dp),
             verticalArrangement = Arrangement.spacedBy(4.dp),
@@ -321,6 +340,16 @@ private fun PassDoneScreen(
 @Composable
 private fun TrimScreen(state: HighlightUiState.Trim, onClose: () -> Unit, onPick: (Long) -> Unit, onUndo: () -> Unit) {
     var peek by remember { mutableStateOf<HighlightPhoto?>(null) }
+    KeyShortcuts { e ->
+        if (e.type != KeyEventType.KeyDown) return@KeyShortcuts false
+        when {
+            e.key == Key.DirectionLeft || e.key == Key.DirectionUp -> true.also { onPick(state.first.mediaId) }
+            e.key == Key.DirectionRight || e.key == Key.DirectionDown -> true.also { onPick(state.second.mediaId) }
+            e.isUndo() -> true.also { if (state.canUndo) onUndo() }
+            else -> false
+        }
+    }
+    val keys = hasShortcuts
     Box(Modifier.fillMaxSize()) {
         Column(Modifier.fillMaxSize().safeDrawingPadding()) {
             TopBar(
@@ -329,28 +358,39 @@ private fun TrimScreen(state: HighlightUiState.Trim, onClose: () -> Unit, onPick
                 onClose = onClose,
                 undo = if (state.canUndo) onUndo else null,
             )
-            for ((i, photo) in listOf(state.first, state.second).withIndex()) {
-                Photo(
-                    photo,
-                    Modifier.weight(1f).fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp)
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(Color.White.copy(alpha = 0.06f))
-                        .testTag(if (i == 0) "pickFirst" else "pickSecond")
-                        .pointerInput(photo.mediaId) {
-                            detectTapGestures(
-                                onTap = { onPick(photo.mediaId) },
-                                // Hold to see it full screen until release; a long press never picks.
-                                onPress = {
-                                    tryAwaitRelease()
-                                    peek = null
+            // Stacked on a phone; side by side in a wide window, where photos get more room that way.
+            BoxWithConstraints(Modifier.weight(1f).fillMaxWidth()) {
+                val sideBySide = maxWidth > maxHeight
+                val photos: @Composable (Modifier) -> Unit = { slot ->
+                    for ((i, photo) in listOf(state.first, state.second).withIndex()) {
+                        Photo(
+                            photo,
+                            slot.padding(horizontal = 8.dp, vertical = 4.dp)
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(Color.White.copy(alpha = 0.06f))
+                                .testTag(if (i == 0) "pickFirst" else "pickSecond")
+                                .pointerInput(photo.mediaId) {
+                                    detectTapGestures(
+                                        onTap = { onPick(photo.mediaId) },
+                                        // Hold to see it full screen until release; a long press never picks.
+                                        onPress = {
+                                            tryAwaitRelease()
+                                            peek = null
+                                        },
+                                        onLongPress = { peek = photo },
+                                    )
                                 },
-                                onLongPress = { peek = photo },
-                            )
-                        },
-                )
+                        )
+                    }
+                }
+                if (sideBySide) {
+                    Row(Modifier.fillMaxSize()) { photos(Modifier.weight(1f).fillMaxHeight()) }
+                } else {
+                    Column(Modifier.fillMaxSize()) { photos(Modifier.weight(1f).fillMaxWidth()) }
+                }
             }
             Text(
-                "Tap the better one · hold to see it full screen",
+                if (keys) "Click the better one, or press ← / → · hold to see it full size" else "Tap the better one · hold to see it full screen",
                 style = MaterialTheme.typography.bodySmall,
                 color = Color.White.copy(alpha = 0.6f),
                 textAlign = TextAlign.Center,
@@ -408,7 +448,7 @@ private fun ResultScreen(
             onTitleClick = { renaming = true },
         )
         LazyVerticalGrid(
-            columns = GridCells.Fixed(3),
+            columns = GridCells.Adaptive(minSize = 120.dp),
             contentPadding = PaddingValues(8.dp),
             horizontalArrangement = Arrangement.spacedBy(4.dp),
             verticalArrangement = Arrangement.spacedBy(4.dp),
@@ -465,3 +505,6 @@ private fun ResultScreen(
         }
     }
 }
+
+private fun androidx.compose.ui.input.key.KeyEvent.isUndo() =
+    (key == Key.Z && (isCtrlPressed || isMetaPressed)) || key == Key.Backspace

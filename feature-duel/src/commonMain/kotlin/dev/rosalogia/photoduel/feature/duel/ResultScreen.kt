@@ -30,20 +30,28 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.isCtrlPressed
+import androidx.compose.ui.input.key.isMetaPressed
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import dev.rosalogia.photoduel.core.common.AppLog
 import dev.rosalogia.photoduel.core.data.db.GroupStatus
+import dev.rosalogia.photoduel.core.ui.KeyShortcuts
 import dev.rosalogia.photoduel.core.ui.LocalPhotoActions
 import dev.rosalogia.photoduel.core.ui.PhotoRef
+import dev.rosalogia.photoduel.core.ui.hasShortcuts
 import kotlinx.coroutines.launch
 
 @Composable
 fun ResultScreen(
     state: DuelUiState.Result,
-    navigation: DuelNavigation,
+    navigation: DuelNavigation?,
     subtitle: String?,
     onUndo: () -> Unit,
     onPickRunnerUp: () -> Unit,
@@ -56,6 +64,23 @@ fun ResultScreen(
     val scope = rememberCoroutineScope()
     val trashCount = state.rest.size
     val finished = state.status != GroupStatus.UNRESOLVED
+    fun trashRest() {
+        scope.launch {
+            val ok = actions.trash(state.rest)
+            AppLog.i("Result", "Trash request ${if (ok) "confirmed" else "cancelled"}")
+            if (ok) onTrashed(trashCount)
+        }
+    }
+    KeyShortcuts { e ->
+        if (e.type != KeyEventType.KeyDown) return@KeyShortcuts false
+        when {
+            (e.key == Key.Z && (e.isCtrlPressed || e.isMetaPressed)) || e.key == Key.Backspace -> true.also { if (state.canUndo) onUndo() }
+            e.key == Key.Delete && trashCount > 0 -> true.also { trashRest() }
+            e.key == Key.Enter && !finished -> true.also { onDone() }
+            else -> false
+        }
+    }
+    val keys = hasShortcuts
 
     Column(Modifier.fillMaxSize().safeDrawingPadding()) {
         DuelTopBar(
@@ -122,25 +147,19 @@ fun ResultScreen(
             }
             if (trashCount > 0) {
                 Button(
-                    onClick = {
-                        scope.launch {
-                            val ok = actions.trash(state.rest)
-                            AppLog.i("Result", "Trash request ${if (ok) "confirmed" else "cancelled"}")
-                            if (ok) onTrashed(trashCount)
-                        }
-                    },
+                    onClick = ::trashRest,
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
                     modifier = Modifier.fillMaxWidth().testTag("trashRest"),
                 ) {
                     Icon(Icons.Filled.Delete, contentDescription = null)
                     Spacer(Modifier.width(6.dp))
-                    Text("Trash the other $trashCount")
+                    Text("Trash the other $trashCount" + if (keys) "  (Delete)" else "")
                 }
             }
             if (finished) {
                 if (state.groupSize >= 2) TextButton(onClick = onDuelAgain, modifier = Modifier.fillMaxWidth().testTag("duelAgain")) { Text("Duel again") }
             } else {
-                TextButton(onClick = onDone, modifier = Modifier.fillMaxWidth().testTag("done")) { Text("Keep all and mark done") }
+                TextButton(onClick = onDone, modifier = Modifier.fillMaxWidth().testTag("done")) { Text("Keep all and mark done" + if (keys) "  (Enter)" else "") }
             }
             Spacer(Modifier.height(4.dp))
         }

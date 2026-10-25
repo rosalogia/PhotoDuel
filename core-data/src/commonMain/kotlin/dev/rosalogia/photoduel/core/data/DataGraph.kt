@@ -24,6 +24,7 @@ class DataGraph(
     val scheduler: IndexScheduler,
     featureExtractor: PhotoFeatureExtractor,
     qualityScorer: PhotoQualityScorer,
+    indexParallelism: Int = 1,
 ) {
     val settings = SettingsRepository(settingsStore)
     val overrides = OverrideRepository(db)
@@ -34,5 +35,5 @@ class DataGraph(
     val editor = GroupEditor(db, overrides, indexer)
     val preScores = PreScoreRepository(db, qualityScorer)
     val highlights = HighlightRepository(db)
-    val featureIndexer = FeatureIndexer(db, featureExtractor, indexer, preScores)
+    val featureIndexer = FeatureIndexer(db, featureExtractor, indexer, preScores, indexParallelism)
 }

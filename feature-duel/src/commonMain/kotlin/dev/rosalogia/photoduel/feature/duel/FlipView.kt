@@ -1,7 +1,5 @@
 package dev.rosalogia.photoduel.feature.duel
 
-import androidx.compose.runtime.setValue
-import androidx.compose.runtime.getValue
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
@@ -12,10 +10,12 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Stable
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.geometry.Offset
@@ -26,6 +26,7 @@ import androidx.compose.ui.graphics.Matrix
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
@@ -38,6 +39,7 @@ import dev.rosalogia.photoduel.core.ml.NormRect
 import dev.rosalogia.photoduel.feature.duel.align.Alignment
 import kotlin.math.abs
 import kotlin.math.min
+import kotlin.math.pow
 
 /** Zoom and pan shared by both photos, so flipping keeps the same spot on screen. */
 @Stable
@@ -78,6 +80,9 @@ class ZoomState {
         scale = 1f
         offset = Offset.Zero
     }
+
+    /** Zooms by [factor] about the middle of the view, e.g. from the keyboard. */
+    fun zoomBy(factor: Float) = transform(factor, Offset(viewport.width / 2f, viewport.height / 2f), Offset.Zero)
 
     private fun clamp(o: Offset): Offset {
         val maxX = viewport.width * (scale - 1) / 2
@@ -130,6 +135,21 @@ fun FlipView(
             .clipToBounds()
             .onSizeChanged { zoom.viewport = it }
             .testTag("flipView")
+            // Mouse wheel or trackpad scroll zooms about the pointer, like most photo viewers.
+            .pointerInput(Unit) {
+                awaitPointerEventScope {
+                    while (true) {
+                        val event = awaitPointerEvent()
+                        if (event.type != PointerEventType.Scroll) continue
+                        val change = event.changes.firstOrNull() ?: continue
+                        val dy = change.scrollDelta.y
+                        if (dy != 0f) {
+                            zoom.transform(SCROLL_ZOOM.pow(-dy), change.position, Offset.Zero)
+                            event.changes.forEach { it.consume() }
+                        }
+                    }
+                }
+            }
             .pointerInput(Unit) {
                 awaitEachGesture {
                     val down = awaitFirstDown(requireUnconsumed = false)
@@ -285,6 +305,9 @@ private fun alignedMatrix(challenger: ImageBitmap, king: ImageBitmap, alignment:
         Transform.scale(king.width.toDouble(), king.height.toDouble()) *
         Transform(alignment.h) *
         Transform.scale(1.0 / challenger.width, 1.0 / challenger.height)
+
+/** Zoom per scroll step; a mouse wheel notch is one step, trackpads send fractions. */
+private const val SCROLL_ZOOM = 1.2f
 
 private class LastTap {
     var time = 0L

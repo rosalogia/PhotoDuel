@@ -15,8 +15,9 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -55,7 +56,8 @@ private const val MAX_THUMBS = 4
 
 @Composable
 fun GroupsRoute(
-    onBack: () -> Unit,
+    /** Null hides the back arrow, e.g. on desktop where the sidebar navigates. */
+    onBack: (() -> Unit)?,
     onOpenTodoGroup: (Long) -> Unit,
     onOpenGroup: (Long) -> Unit,
     onEditGroup: (Long) -> Unit,
@@ -85,7 +87,7 @@ fun GroupsScreen(
     state: GroupsUiState,
     onTab: (GroupsTab) -> Unit,
     onShowAllTime: (Boolean) -> Unit,
-    onBack: () -> Unit,
+    onBack: (() -> Unit)?,
     /** A to-do group opens in the feed; a done one opens on its own. */
     onOpenTodoGroup: (Long) -> Unit,
     onOpenGroup: (Long) -> Unit,
@@ -102,8 +104,10 @@ fun GroupsScreen(
                 TopAppBar(
                     title = { Text("Library") },
                     navigationIcon = {
-                        IconButton(onClick = onBack, modifier = Modifier.testTag("listBack")) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back to feed")
+                        if (onBack != null) {
+                            IconButton(onClick = onBack, modifier = Modifier.testTag("listBack")) {
+                                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back to feed")
+                            }
                         }
                     },
                     actions = {
@@ -159,9 +163,12 @@ fun GroupsScreen(
             } else if (state.loaded && state.visible.isEmpty()) {
                 EmptyState(state)
             } else {
-                LazyColumn(
+                // One column on a phone; as many as fit in a wide desktop window.
+                LazyVerticalGrid(
+                    columns = GridCells.Adaptive(minSize = 340.dp),
                     contentPadding = PaddingValues(16.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
                     modifier = Modifier.fillMaxSize().testTag("groupList"),
                 ) {
                     items(state.visible, key = { it.id }) { group ->

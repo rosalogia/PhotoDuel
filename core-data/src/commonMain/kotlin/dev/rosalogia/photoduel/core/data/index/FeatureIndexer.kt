@@ -5,6 +5,12 @@ import dev.rosalogia.photoduel.core.data.LibraryIndexer
 import dev.rosalogia.photoduel.core.data.PreScoreRepository
 import dev.rosalogia.photoduel.core.data.db.PhotoDuelDatabase
 import dev.rosalogia.photoduel.core.data.grouping.toBytes
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 
 /** Starts [FeatureIndexer.run] in the background: WorkManager on Android, a coroutine on desktop. */
 interface IndexScheduler {
@@ -22,6 +28,8 @@ class FeatureIndexer(
     private val extractor: PhotoFeatureExtractor,
     private val indexer: LibraryIndexer,
     private val preScores: PreScoreRepository,
+    /** Photos processed at once: 1 on phones, more on desktops where decoding dominates. */
+    private val parallelism: Int = 1,
 ) {
     /** [isStopped] is polled between photos; [onProgress] gets the number of photos indexed so far. */
     suspend fun run(isStopped: () -> Boolean, onProgress: suspend (Int) -> Unit = {}) {
@@ -34,18 +42,27 @@ class FeatureIndexer(
         while (!isStopped()) {
             val batch = dao.unindexedIds(BATCH)
             if (batch.isEmpty()) break
-            for (id in batch) {
-                if (isStopped()) break
-                val features = try {
-                    extractor.extract(id)
-                } catch (e: Exception) {
-                    if (e is kotlinx.coroutines.CancellationException) throw e
-                    AppLog.w(TAG, "Feature extraction failed for $id", e)
-                    failed++
-                    null
-                }
+            val permits = Semaphore(parallelism)
+            val results = coroutineScope {
+                batch.map { id ->
+                    async {
+                        permits.withPermit {
+                            if (isStopped()) return@async null
+                            id to try {
+                                extractor.extract(id)
+                            } catch (e: Exception) {
+                                if (e is CancellationException) throw e
+                                AppLog.w(TAG, "Feature extraction failed for $id", e)
+                                null
+                            }
+                        }
+                    }
+                }.awaitAll().filterNotNull()
+            }
+            for ((id, features) in results) {
                 // Failures are marked indexed with no features so they aren't retried forever.
                 dao.setFeatures(id, features?.embedding?.toBytes(), features?.dhash, System.currentTimeMillis())
+                if (features == null) failed++
                 done++
             }
             onProgress(done)
