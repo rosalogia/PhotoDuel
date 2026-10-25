@@ -2,8 +2,6 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.compose.compiler)
     alias(libs.plugins.kotlin.serialization)
-    alias(libs.plugins.ksp)
-    alias(libs.plugins.hilt)
 }
 
 android {
@@ -57,6 +55,8 @@ android {
     androidResources {
         // ML Kit bundles its face-contour model; contour mode is never enabled.
         ignoreAssetsPatterns += "contours.tfl"
+        // The embedding model is memory-mapped by MediaPipe, which needs it stored uncompressed.
+        noCompress += "tflite"
     }
     packaging {
         // Compress native libs and dex in the APK (OpenCV alone is ~25 MB uncompressed), keeping the
@@ -80,6 +80,7 @@ dependencies {
     implementation(project(":feature-groups"))
     implementation(project(":feature-duel"))
     implementation(project(":feature-highlights"))
+    implementation(project(":core-ui"))
 
     val composeBom = platform(libs.androidx.compose.bom)
     implementation(composeBom)
@@ -98,17 +99,22 @@ dependencies {
     implementation(libs.androidx.navigation3.ui)
     implementation(libs.androidx.navigation3.runtime)
     implementation(libs.kotlinx.serialization.json)
-    implementation(libs.hilt.android)
-    ksp(libs.hilt.compiler)
-    implementation(libs.androidx.hilt.lifecycle.viewmodel.compose)
     implementation(libs.coil.compose)
     implementation(libs.work.runtime)
-    implementation(libs.androidx.hilt.work)
+    implementation(libs.datastore.preferences)
+    implementation(libs.androidx.lifecycle.process)
+    implementation(libs.mediapipe.tasks.vision)
+    implementation(libs.mlkit.face.detection)
+    implementation(libs.opencv)
 
     debugImplementation(libs.androidx.compose.ui.tooling)
+    debugImplementation(libs.guava)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
     androidTestImplementation(libs.androidx.test.ext.junit)
     androidTestImplementation(libs.androidx.test.runner)
+    androidTestImplementation(libs.androidx.test.rules)
+    androidTestImplementation(libs.truth)
+    androidTestImplementation(libs.kotlinx.coroutines.test)
 }

@@ -1,43 +1,25 @@
 plugins {
-    alias(libs.plugins.android.library)
+    alias(libs.plugins.kotlin.multiplatform)
+    alias(libs.plugins.android.kmp.library)
     alias(libs.plugins.compose.compiler)
-    alias(libs.plugins.ksp)
-    alias(libs.plugins.hilt)
-}
-
-android {
-    namespace = "dev.rosalogia.photoduel.feature.highlights"
-    compileSdk = 37
-    defaultConfig { minSdk = 30 }
-    compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_17
-        targetCompatibility = JavaVersion.VERSION_17
-    }
-    buildFeatures { compose = true }
 }
 
 kotlin {
     jvmToolchain(17)
-}
+    android {
+        namespace = "dev.rosalogia.photoduel.feature.highlights"
+        compileSdk = 37
+        minSdk = 30
+    }
+    jvm("desktop")
 
-dependencies {
-    implementation(project(":core-data"))
-
-    val composeBom = platform(libs.androidx.compose.bom)
-    implementation(composeBom)
-    implementation(libs.androidx.compose.ui)
-    implementation(libs.androidx.compose.ui.tooling.preview)
-    implementation(libs.androidx.compose.material3)
-    implementation(libs.androidx.compose.material.icons)
-    implementation(libs.androidx.activity.compose)
-    implementation(libs.androidx.lifecycle.runtime.compose)
-    implementation(libs.androidx.lifecycle.viewmodel.compose)
-    implementation(libs.hilt.android)
-    ksp(libs.hilt.compiler)
-    implementation(libs.androidx.hilt.lifecycle.viewmodel.compose)
-    implementation(libs.coil.compose)
-    debugImplementation(libs.androidx.compose.ui.tooling)
-
-    testImplementation(libs.junit)
-    testImplementation(libs.truth)
+    sourceSets {
+        commonMain.dependencies {
+            implementation(project(":core-ui"))
+        }
+        getByName("desktopTest").dependencies {
+            implementation(libs.junit)
+            implementation(libs.truth)
+        }
+    }
 }

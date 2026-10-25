@@ -29,23 +29,20 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
-import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
-import dagger.hilt.android.lifecycle.HiltViewModel
 import dev.rosalogia.photoduel.BuildConfig
 import dev.rosalogia.photoduel.core.data.settings.Settings
 import dev.rosalogia.photoduel.core.data.settings.SettingsRepository
+import dev.rosalogia.photoduel.core.ui.graphViewModel
+import kotlin.math.roundToLong
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
-import javax.inject.Inject
-import kotlin.math.roundToLong
 
-@HiltViewModel
-class SettingsViewModel @Inject constructor(
+class SettingsViewModel(
     private val repo: SettingsRepository,
 ) : ViewModel() {
     val settings: StateFlow<Settings?> = repo.settings.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
@@ -65,7 +62,7 @@ private fun roundGap(seconds: Float): Long = (seconds / 5).roundToLong() * 5
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SettingsScreen(onBack: () -> Unit, onOpenLogs: () -> Unit, viewModel: SettingsViewModel = hiltViewModel()) {
+fun SettingsScreen(onBack: () -> Unit, onOpenLogs: () -> Unit, viewModel: SettingsViewModel = graphViewModel { SettingsViewModel(it.data.settings) }) {
     val settings by viewModel.settings.collectAsStateWithLifecycle()
     Scaffold(
         topBar = {

@@ -1,26 +1,33 @@
 plugins {
-    alias(libs.plugins.android.library)
+    alias(libs.plugins.kotlin.multiplatform)
+    alias(libs.plugins.android.kmp.library)
     alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.ksp)
-    alias(libs.plugins.hilt)
     alias(libs.plugins.room)
-}
-
-android {
-    namespace = "dev.rosalogia.photoduel.core.data"
-    compileSdk = 37
-    defaultConfig {
-        minSdk = 30
-        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-    }
-    compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_17
-        targetCompatibility = JavaVersion.VERSION_17
-    }
 }
 
 kotlin {
     jvmToolchain(17)
+    android {
+        namespace = "dev.rosalogia.photoduel.core.data"
+        compileSdk = 37
+        minSdk = 30
+    }
+    jvm("desktop")
+
+    sourceSets {
+        commonMain.dependencies {
+            api(project(":core-common"))
+            api(libs.room.runtime)
+            api(libs.datastore.preferences.core)
+            implementation(libs.kotlinx.serialization.json)
+        }
+        getByName("desktopTest").dependencies {
+            implementation(libs.junit)
+            implementation(libs.truth)
+            implementation(libs.kotlinx.coroutines.test)
+        }
+    }
 }
 
 room {
@@ -28,28 +35,6 @@ room {
 }
 
 dependencies {
-    api(project(":core-common"))
-    implementation(libs.androidx.core.ktx)
-    api(libs.kotlinx.coroutines.android)
-    implementation(libs.kotlinx.serialization.json)
-    implementation(libs.hilt.android)
-    ksp(libs.hilt.compiler)
-    implementation(libs.room.runtime)
-    implementation(libs.room.ktx)
-    ksp(libs.room.compiler)
-    implementation(libs.datastore.preferences)
-    implementation(libs.androidx.lifecycle.process)
-    implementation(libs.work.runtime)
-    implementation(libs.androidx.hilt.work)
-    ksp(libs.androidx.hilt.compiler)
-
-    testImplementation(libs.junit)
-    testImplementation(libs.truth)
-    testImplementation(libs.kotlinx.coroutines.test)
-    androidTestImplementation(libs.androidx.test.ext.junit)
-    androidTestImplementation(libs.androidx.test.runner)
-    androidTestImplementation(libs.androidx.test.rules)
-    androidTestImplementation(libs.truth)
-    androidTestImplementation(libs.room.testing)
-    androidTestImplementation(libs.kotlinx.coroutines.test)
+    add("kspAndroid", libs.room.compiler)
+    add("kspDesktop", libs.room.compiler)
 }

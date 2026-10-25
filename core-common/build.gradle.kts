@@ -1,23 +1,21 @@
 plugins {
-    alias(libs.plugins.android.library)
-}
+    alias(libs.plugins.kotlin.multiplatform)
+    alias(libs.plugins.android.kmp.library)
 
-android {
-    namespace = "dev.rosalogia.photoduel.core.common"
-    compileSdk = 37
-    defaultConfig { minSdk = 30 }
-    compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_17
-        targetCompatibility = JavaVersion.VERSION_17
-    }
 }
 
 kotlin {
     jvmToolchain(17)
-}
+    android {
+        namespace = "dev.rosalogia.photoduel.core.common"
+        compileSdk = 37
+        minSdk = 30
+    }
+    jvm("desktop")
 
-dependencies {
-    implementation(libs.kotlinx.coroutines.android)
-    testImplementation(libs.junit)
-    testImplementation(libs.truth)
+    sourceSets {
+        commonMain.dependencies {
+            api(libs.kotlinx.coroutines.core)
+        }
+    }
 }

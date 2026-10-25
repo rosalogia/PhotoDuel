@@ -25,7 +25,7 @@
             </intent-filter>
         </activity>
 
-        <!-- WorkManager is initialized on demand with Hilt's worker factory (see PhotoDuelApp). -->
+        <!-- WorkManager is initialized on demand with the app's worker factory (see PhotoDuelApp). -->
         <provider
             android:name="androidx.startup.InitializationProvider"
             android:authorities="${applicationId}.androidx-startup"
