@@ -23,7 +23,10 @@ object DesktopNatives {
     /** Loads OpenCV's Java bindings and everything they link, in whatever order works. */
     fun loadOpenCv(): Boolean = runCatching {
         val d = checkNotNull(dir) { "No native library folder" }
-        val pending = d.listFiles()!!.filter { isLibrary(it) && !it.name.contains("onnxruntime") && !isSystemProvided(it) }.toMutableList()
+        // The Visual C++ runtime goes first, so OpenCV binds to the bundled copy, which may be newer than Java's.
+        val pending = d.listFiles()!!.filter { isLibrary(it) && !it.name.contains("onnxruntime") && !isSystemProvided(it) }
+            .sortedBy { if (it.name.matches(VC_RUNTIME)) 0 else 1 }
+            .toMutableList()
         // Without the dependency graph, retry whatever failed until a pass loads nothing new.
         var progress = true
         while (pending.isNotEmpty() && progress) {
@@ -46,5 +49,6 @@ object DesktopNatives {
     /** Every Linux system has its own C++ runtime; loading a second copy invites trouble. */
     private fun isSystemProvided(f: File) = !windows && (f.name.startsWith("libgcc_s") || f.name.startsWith("libstdc++"))
 
+    private val VC_RUNTIME = Regex("(msvcp|vcruntime|concrt|vcomp)140.*\\.dll", RegexOption.IGNORE_CASE)
     private const val TAG = "Natives"
 }

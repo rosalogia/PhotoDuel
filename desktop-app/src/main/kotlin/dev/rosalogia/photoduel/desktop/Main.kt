@@ -13,11 +13,18 @@ import dev.rosalogia.photoduel.core.ui.ShortcutDispatcher
 import dev.rosalogia.photoduel.desktop.ui.App
 import java.awt.Dimension
 import java.io.File
+import kotlin.system.exitProcess
 
-const val VERSION = "0.3.0"
+/** Set by the packaged app's launcher; "dev" when run from Gradle. */
+val VERSION: String = System.getProperty("jpackage.app-version") ?: "dev"
 
-fun main() {
+fun main(args: Array<String>) {
     AppLog.init(File(AppDirs.data, "logs"))
+    if (args.firstOrNull() == "--self-test") {
+        // Returning beats System.exit on success: jpackage's Linux launcher aborts noisily after exit().
+        if (!SelfTest.run(only = args.drop(1))) exitProcess(1)
+        return
+    }
     val previous = Thread.getDefaultUncaughtExceptionHandler()
     Thread.setDefaultUncaughtExceptionHandler { thread, t ->
         AppLog.recordCrash(thread, t)

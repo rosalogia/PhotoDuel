@@ -48,7 +48,7 @@ class OnnxFeatureExtractor(private val decoder: DesktopPhotoDecoder) : PhotoFeat
         }
     }
 
-    private fun embed(thumb: Bitmap): FloatArray {
+    internal fun embed(thumb: Bitmap): FloatArray {
         val input = stretch(thumb)
         val pixels = Decoding.argb(input).also { input.close() }
         val data = FloatBuffer.allocate(SIZE * SIZE * 3)
