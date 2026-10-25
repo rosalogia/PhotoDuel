@@ -30,6 +30,7 @@ jbNav3 = "1.2.0"
 sqliteBundled = "2.7.1"
 bytedecoOpencv = "4.14.0-1.5.14"
 bytedecoOpenblas = "0.3.34-1.5.14"
+bytedecoJavacpp = "1.5.14"
 onnxruntime = "1.31.0"
 jna = "5.19.1"
 metadataExtractor = "2.22.0"
@@ -90,6 +91,7 @@ datastore-preferences-core = { module = "androidx.datastore:datastore-preference
 sqlite-bundled = { module = "androidx.sqlite:sqlite-bundled", version.ref = "sqliteBundled" }
 bytedeco-opencv = { module = "org.bytedeco:opencv", version.ref = "bytedecoOpencv" }
 bytedeco-openblas = { module = "org.bytedeco:openblas", version.ref = "bytedecoOpenblas" }
+bytedeco-javacpp = { module = "org.bytedeco:javacpp", version.ref = "bytedecoJavacpp" }
 onnxruntime = { module = "com.microsoft.onnxruntime:onnxruntime", version.ref = "onnxruntime" }
 jna = { module = "net.java.dev.jna:jna", version.ref = "jna" }
 metadata-extractor = { module = "com.drewnoakes:metadata-extractor", version.ref = "metadataExtractor" }

@@ -30,7 +30,8 @@ import kotlin.math.sqrt
  * in 0..1. On test photos this matches MediaPipe's embeddings to a cosine similarity of 0.997.
  */
 class OnnxFeatureExtractor(private val decoder: DesktopPhotoDecoder) : PhotoFeatureExtractor {
-    private val env = OrtEnvironment.getEnvironment()
+    // Lazy, so a missing native library stops indexing (an Error ends the run) instead of the app.
+    private val env by lazy { OrtEnvironment.getEnvironment() }
     private val session: OrtSession by lazy {
         val model = javaClass.getResourceAsStream("/models/image_embedder.onnx")!!.use { it.readBytes() }
         env.createSession(model, OrtSession.SessionOptions().apply { setIntraOpNumThreads(1) })

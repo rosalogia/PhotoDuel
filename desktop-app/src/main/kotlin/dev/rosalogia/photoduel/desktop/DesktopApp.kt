@@ -13,7 +13,7 @@ import dev.rosalogia.photoduel.desktop.catalog.CatalogDatabase
 import dev.rosalogia.photoduel.desktop.catalog.CatalogDatabase_Impl
 import dev.rosalogia.photoduel.desktop.catalog.FolderPhotoSource
 import dev.rosalogia.photoduel.desktop.image.DesktopPhotoDecoder
-import dev.rosalogia.photoduel.desktop.ml.DesktopOpenCv
+import dev.rosalogia.photoduel.desktop.ml.DesktopNatives
 import dev.rosalogia.photoduel.desktop.ml.OnnxFeatureExtractor
 import dev.rosalogia.photoduel.desktop.ml.YuNetFaceDetector
 import dev.rosalogia.photoduel.desktop.platform.CoroutineIndexScheduler
@@ -49,7 +49,8 @@ class DesktopApp private constructor(
 
     companion object {
         fun create(): DesktopApp {
-            OpenCv.loader = DesktopOpenCv::load
+            DesktopNatives.init()
+            OpenCv.loader = DesktopNatives::loadOpenCv
             val scope = CoroutineScope(
                 SupervisorJob() + Dispatchers.Default + CoroutineExceptionHandler { _, e -> AppLog.e("App", "Background task failed", e) },
             )

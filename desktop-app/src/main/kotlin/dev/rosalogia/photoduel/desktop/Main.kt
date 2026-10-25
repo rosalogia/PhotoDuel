@@ -1,5 +1,8 @@
+@file:Suppress("DEPRECATION") // painterResource(String): Compose resources would be overkill for one icon.
+
 package dev.rosalogia.photoduel.desktop
 
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Window
@@ -27,7 +30,13 @@ fun main() {
     application {
         val state = rememberWindowState(size = DpSize(1280.dp, 860.dp))
         // Keys a focused text field didn't use go to whichever screens registered shortcuts.
-        Window(onCloseRequest = ::exitApplication, title = "Photo Duel", state = state, onKeyEvent = shortcuts::dispatch) {
+        Window(
+            onCloseRequest = ::exitApplication,
+            title = "Photo Duel",
+            state = state,
+            icon = painterResource("icon.png"),
+            onKeyEvent = shortcuts::dispatch,
+        ) {
             window.minimumSize = Dimension(900, 600)
             App(app, shortcuts)
         }
