@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Themed-icon version: one color, the front photo plus the visible edge of the one behind. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="108dp" android:height="108dp" android:viewportWidth="108" android:viewportHeight="108">
+  <group android:scaleX="0.0726" android:scaleY="0.0726" android:translateX="16.61" android:translateY="15.88">
+    <path android:fillColor="#FF000000" android:pathData="M198,360 H682 A48,48 0 0 1 730,408 V792 A48,48 0 0 1 682,840 H198 A48,48 0 0 1 150,792 V408 A48,48 0 0 1 198,360 Z M206,388 H674 A28,28 0 0 1 702,416 V784 A28,28 0 0 1 674,812 H206 A28,28 0 0 1 178,784 V416 A28,28 0 0 1 206,388 Z" android:fillType="evenOdd"/>
+    <path android:fillColor="#FF000000" android:pathData="M178.0,812.0 L377.1,566.1 L502.9,684.8 L597.2,600.0 L702.0,812.0 Z"/>
+    <path android:fillColor="#FF000000" android:pathData="M552,478 A40,40 0 1 1 632,478 A40,40 0 1 1 552,478 Z"/>
+    <path android:strokeColor="#FF000000" android:strokeWidth="28" android:strokeLineJoin="round" android:pathData="M314,360 V258 Q314,224 348,224 H832 Q866,224 866,258 V642 Q866,676 832,676 H730"/>
+  </group>
+</vector>
