@@ -3,14 +3,13 @@
 package dev.rosalogia.photoduel.desktop
 
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.unit.DpSize
-import androidx.compose.ui.unit.dp
+import androidx.compose.runtime.remember
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
-import androidx.compose.ui.window.rememberWindowState
 import dev.rosalogia.photoduel.core.common.AppLog
 import dev.rosalogia.photoduel.core.ui.ShortcutDispatcher
 import dev.rosalogia.photoduel.desktop.ui.App
+import dev.rosalogia.photoduel.desktop.ui.SavedWindow
 import java.awt.Dimension
 import java.io.File
 import kotlin.system.exitProcess
@@ -34,11 +33,15 @@ fun main(args: Array<String>) {
     val app = DesktopApp.create()
     app.start()
     val shortcuts = ShortcutDispatcher()
+    val saved = SavedWindow(File(AppDirs.data, "window.txt"))
     application {
-        val state = rememberWindowState(size = DpSize(1280.dp, 860.dp))
+        val state = remember { saved.restore() }
         // Keys a focused text field didn't use go to whichever screens registered shortcuts.
         Window(
-            onCloseRequest = ::exitApplication,
+            onCloseRequest = {
+                saved.save(state)
+                exitApplication()
+            },
             title = "Photo Duel",
             state = state,
             icon = painterResource("icon.png"),
