@@ -329,7 +329,7 @@ class HighlightSessionViewModel(
             copying = null
             render()
         }
-        val where = copier.albumPath(set.name).trimEnd('/')
+        val where = copier.albumPath(set.name).trimEnd('/', '\\')
         _events.send(
             HighlightEvent.Message(
                 when {

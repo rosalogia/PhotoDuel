@@ -125,41 +125,48 @@ private fun Shell(app: DesktopApp) {
         if (stack.size > 1 && stack.last() == screen) stack.removeAt(stack.lastIndex)
     }
 
-    Row(Modifier.fillMaxSize()) {
-        val root = stack.first()
-        NavigationRail(Modifier.fillMaxHeight()) {
-            RailItem("Sort", DesktopIcons.Compare, root == Screen.Sort) { go(Screen.Sort) }
-            RailItem("Library", DesktopIcons.PhotoLibrary, root == Screen.Library) { go(Screen.Library) }
-            RailItem("Settings", Icons.Filled.Settings, root == Screen.Settings) { go(Screen.Settings) }
-            Spacer(Modifier.weight(1f))
-            RailItem("Keys", DesktopIcons.Keyboard, false) { showKeys = true }
-        }
-        VerticalDivider()
-        Column(Modifier.weight(1f).fillMaxHeight()) {
-            Progress(app)
-            Box(Modifier.weight(1f).fillMaxWidth()) {
-                val screen = stack.last()
-                ScreenScope(screen, stores, saveable) {
-                    when (screen) {
-                        Screen.Sort -> SortScreen(selected = sortSelection, onSelect = { sortSelection = it }, onOpenLibrary = { go(Screen.Library) })
-                        Screen.Library -> GroupsRoute(
-                            onBack = null,
-                            onOpenTodoGroup = {
-                                sortSelection = it
-                                go(Screen.Sort)
-                            },
-                            onOpenGroup = { stack.add(Screen.Duel(it)) },
-                            onEditGroup = { stack.add(Screen.EditGroup(it)) },
-                            highlights = { HighlightsTab(onOpenSet = { stack.add(Screen.Highlight(it)) }) },
-                        )
-                        Screen.Settings -> SettingsScreen(app)
-                        is Screen.Duel -> DuelRoute(
-                            groupId = screen.groupId,
-                            onFinished = { pop(screen) },
-                            navigation = DuelNavigation(onClick = { pop(screen) }),
-                        )
-                        is Screen.EditGroup -> GroupEditRoute(groupId = screen.groupId, onClose = { pop(screen) })
-                        is Screen.Highlight -> HighlightSessionRoute(setId = screen.setId, onClose = { pop(screen) })
+    // Photo screens are dark; the sidebar and group list follow, so the window isn't half light.
+    val top = stack.last()
+    val photoScreen = top == Screen.Sort || top is Screen.Duel || top is Screen.Highlight
+    MaterialTheme(colorScheme = if (photoScreen) LocalDarkColors.current else MaterialTheme.colorScheme) {
+        Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+            Row(Modifier.fillMaxSize()) {
+                val root = stack.first()
+                NavigationRail(Modifier.fillMaxHeight()) {
+                    RailItem("Sort", DesktopIcons.Compare, root == Screen.Sort) { go(Screen.Sort) }
+                    RailItem("Library", DesktopIcons.PhotoLibrary, root == Screen.Library) { go(Screen.Library) }
+                    RailItem("Settings", Icons.Filled.Settings, root == Screen.Settings) { go(Screen.Settings) }
+                    Spacer(Modifier.weight(1f))
+                    RailItem("Keys", DesktopIcons.Keyboard, false) { showKeys = true }
+                }
+                VerticalDivider()
+                Column(Modifier.weight(1f).fillMaxHeight()) {
+                    Progress(app)
+                    Box(Modifier.weight(1f).fillMaxWidth()) {
+                        val screen = stack.last()
+                        ScreenScope(screen, stores, saveable) {
+                            when (screen) {
+                                Screen.Sort -> SortScreen(selected = sortSelection, onSelect = { sortSelection = it }, onOpenLibrary = { go(Screen.Library) })
+                                Screen.Library -> GroupsRoute(
+                                    onBack = null,
+                                    onOpenTodoGroup = {
+                                        sortSelection = it
+                                        go(Screen.Sort)
+                                    },
+                                    onOpenGroup = { stack.add(Screen.Duel(it)) },
+                                    onEditGroup = { stack.add(Screen.EditGroup(it)) },
+                                    highlights = { HighlightsTab(onOpenSet = { stack.add(Screen.Highlight(it)) }) },
+                                )
+                                Screen.Settings -> SettingsScreen(app)
+                                is Screen.Duel -> DuelRoute(
+                                    groupId = screen.groupId,
+                                    onFinished = { pop(screen) },
+                                    navigation = DuelNavigation(onClick = { pop(screen) }),
+                                )
+                                is Screen.EditGroup -> GroupEditRoute(groupId = screen.groupId, onClose = { pop(screen) })
+                                is Screen.Highlight -> HighlightSessionRoute(setId = screen.setId, onClose = { pop(screen) })
+                            }
+                        }
                     }
                 }
             }

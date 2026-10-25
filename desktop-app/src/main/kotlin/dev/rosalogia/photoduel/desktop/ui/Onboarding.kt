@@ -49,7 +49,7 @@ fun Onboarding(app: DesktopApp) {
             all.forEach { folder ->
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Checkbox(checked = folder in chosen, onCheckedChange = { if (it) chosen += folder else chosen -= folder })
-                    Text(folder.path, style = MaterialTheme.typography.bodyMedium)
+                    FolderText(folder, MaterialTheme.typography.bodyMedium)
                 }
             }
             OutlinedButton(onClick = {

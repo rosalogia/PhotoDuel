@@ -53,7 +53,7 @@ fun SettingsScreen(app: DesktopApp) {
             Spacer(Modifier.height(8.dp))
             folders.forEach { folder ->
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(folder.path, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
+                    FolderText(folder, MaterialTheme.typography.bodyMedium, Modifier.weight(1f))
                     IconButton(onClick = { app.folders.remove(folder) }, enabled = folders.size > 1) {
                         Icon(Icons.Filled.Close, contentDescription = "Remove ${folder.path}")
                     }
@@ -67,7 +67,7 @@ fun SettingsScreen(app: DesktopApp) {
             }) { Text("Add a folder…") }
             Spacer(Modifier.height(8.dp))
             Text(
-                "Highlight albums are copied to ${app.highlightsRoot.path}",
+                "Highlight albums are copied to ${displayPath(app.highlightsRoot)}",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

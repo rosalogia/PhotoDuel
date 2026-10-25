@@ -10,10 +10,8 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -21,9 +19,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -306,16 +301,8 @@ private fun PassDoneScreen(
                 color = Color.White.copy(alpha = 0.75f),
             )
         }
-        LazyVerticalGrid(
-            columns = GridCells.Adaptive(minSize = 96.dp),
-            contentPadding = PaddingValues(12.dp),
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp),
-            modifier = Modifier.weight(1f),
-        ) {
-            items(state.kept, key = { it.mediaId }) {
-                Photo(it.copy(burstSize = 1), Modifier.aspectRatio(1f).clip(RoundedCornerShape(6.dp)), ContentScale.Crop)
-            }
+        FittingGrid(state.kept, key = { it.mediaId }, modifier = Modifier.weight(1f).fillMaxWidth()) { photo, tile ->
+            Photo(photo.copy(burstSize = 1), tile.clip(RoundedCornerShape(6.dp)), ContentScale.Crop)
         }
         Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             when {
@@ -447,20 +434,18 @@ private fun ResultScreen(
             titleTag = "resultTitle",
             onTitleClick = { renaming = true },
         )
-        LazyVerticalGrid(
-            columns = GridCells.Adaptive(minSize = 120.dp),
-            contentPadding = PaddingValues(8.dp),
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp),
-            modifier = Modifier.weight(1f).testTag("highlightGrid"),
-        ) {
-            items(state.selected, key = { it.mediaId }) { photo ->
-                Photo(
-                    photo.copy(burstSize = 1),
-                    Modifier.aspectRatio(1f).clip(RoundedCornerShape(6.dp)).clickable { actions.open(photo.mediaId) },
-                    ContentScale.Crop,
-                )
-            }
+        FittingGrid(
+            state.selected,
+            key = { it.mediaId },
+            modifier = Modifier.weight(1f).fillMaxWidth().testTag("highlightGrid"),
+            minTile = 120.dp,
+            padding = 8.dp,
+        ) { photo, tile ->
+            Photo(
+                photo.copy(burstSize = 1),
+                tile.clip(RoundedCornerShape(6.dp)).clickable { actions.open(photo.mediaId) },
+                ContentScale.Crop,
+            )
         }
         Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             val allCopied = state.copied == ids.size
@@ -472,7 +457,7 @@ private fun ResultScreen(
                 Text(
                     when {
                         state.copying != null -> "Copying ${state.copying + 1} of ${ids.size}…"
-                        allCopied -> "In album ${state.albumPath.trimEnd('/')} ✓"
+                        allCopied -> "In album ${state.albumPath.trimEnd('/', '\\')} ✓"
                         state.copied > 0 -> "Copy the rest to the album"
                         else -> "Copy to album"
                     },

@@ -4,6 +4,7 @@ import dev.rosalogia.photoduel.core.common.AppLog
 import dev.rosalogia.photoduel.core.data.media.AlbumCopier
 import dev.rosalogia.photoduel.desktop.catalog.AlbumCopyEntity
 import dev.rosalogia.photoduel.desktop.catalog.CatalogDao
+import dev.rosalogia.photoduel.desktop.ui.displayPath
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -16,7 +17,7 @@ class FileAlbumCopier(
     private val dao: CatalogDao,
     private val pathOf: suspend (Long) -> File?,
 ) : AlbumCopier {
-    override fun albumPath(album: String): String = folder(album).path + File.separator
+    override fun albumPath(album: String): String = displayPath(folder(album)) + File.separator
 
     fun folder(album: String) = File(root, AlbumCopier.safeName(album))
 
