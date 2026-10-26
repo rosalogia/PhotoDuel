@@ -1,5 +1,6 @@
 package dev.rosalogia.photoduel.debug
 
+import dev.rosalogia.photoduel.core.ui.APP_NAME
 import android.content.Context
 import android.content.Intent
 import android.os.Build
@@ -48,7 +49,7 @@ fun shareLogs(context: Context) {
     dir.listFiles()?.filter { it.name.startsWith("photoduel-logs-") }?.forEach { it.delete() }
     file.writeText(
         buildString {
-            appendLine("Photo Duel ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE}) ${BuildConfig.BUILD_TYPE}")
+            appendLine("$APP_NAME ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE}) ${BuildConfig.BUILD_TYPE}")
             appendLine("Device: ${Build.MANUFACTURER} ${Build.MODEL}, Android ${Build.VERSION.RELEASE} (API ${Build.VERSION.SDK_INT})")
             appendLine()
             AppLog.crashFile?.takeIf { it.exists() }?.let {
@@ -64,7 +65,7 @@ fun shareLogs(context: Context) {
     val send = Intent(Intent.ACTION_SEND).apply {
         type = "text/plain"
         putExtra(Intent.EXTRA_STREAM, uri)
-        putExtra(Intent.EXTRA_SUBJECT, "Photo Duel logs $stamp")
+        putExtra(Intent.EXTRA_SUBJECT, "$APP_NAME logs $stamp")
         addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
     }
     context.startActivity(Intent.createChooser(send, "Share logs"))
@@ -113,7 +114,7 @@ fun CrashReportPrompt() {
     }
     AlertDialog(
         onDismissRequest = ::dismiss,
-        title = { Text("Photo Duel crashed last time") },
+        title = { Text("$APP_NAME closed unexpectedly last time") },
         text = { Text(report.lineSequence().take(6).joinToString("\n"), fontFamily = FontFamily.Monospace, fontSize = 11.sp) },
         confirmButton = {
             TextButton(onClick = {

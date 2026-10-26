@@ -4,6 +4,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.consumeWindowInsets
@@ -17,12 +18,8 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.pager.VerticalPager
 import androidx.compose.foundation.pager.rememberPagerState
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.List
-import androidx.compose.material3.Button
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -32,14 +29,22 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModelStore
 import androidx.lifecycle.ViewModelStoreOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.LocalViewModelStoreOwner
 import dev.rosalogia.photoduel.core.common.friendlyTime
+import dev.rosalogia.photoduel.core.ui.BrandIcons
+import dev.rosalogia.photoduel.core.ui.Ink
+import dev.rosalogia.photoduel.core.ui.LocalBrandFonts
+import dev.rosalogia.photoduel.core.ui.Moment
+import dev.rosalogia.photoduel.core.ui.PhotoStage
+import dev.rosalogia.photoduel.core.ui.PrimaryButton
+import dev.rosalogia.photoduel.core.ui.Readout
+import dev.rosalogia.photoduel.core.ui.SecondaryButton
 import dev.rosalogia.photoduel.core.ui.graphViewModel
 
 /**
@@ -70,13 +75,17 @@ fun FeedRoute(
         jumped()
     }
 
-    val listNavigation = DuelNavigation(icon = Icons.AutoMirrored.Filled.List, label = "Library", onClick = onOpenList)
-    DuelTheme {
+    val listNavigation = DuelNavigation(icon = BrandIcons.Library, label = "Library", onClick = onOpenList)
+    PhotoStage {
         Column(Modifier.fillMaxSize()) {
             if (banner != null) Box(Modifier.statusBarsPadding()) { banner() }
             Box(Modifier.weight(1f).then(if (banner != null) Modifier.consumeWindowInsets(WindowInsets.statusBars) else Modifier)) {
                 if (state.loaded && groups.isEmpty()) {
-                    EmptyFeed(state, onOpenList, viewModel::showAllTime)
+                    Box(Modifier.fillMaxSize().safeDrawingPadding().testTag("feedEmpty"), contentAlignment = Alignment.CenterStart) {
+                        FeedEmpty(state, onShowAllTime = viewModel::showAllTime) {
+                            SecondaryButton("Library", onOpenList, icon = BrandIcons.Library, modifier = Modifier.testTag("feedOpenList"))
+                        }
+                    }
                 } else {
                     VerticalPager(
                         state = pager,
@@ -87,11 +96,11 @@ fun FeedRoute(
                         CompositionLocalProvider(LocalViewModelStoreOwner provides rememberPageViewModelStoreOwner()) {
                             DuelRoute(
                                 groupId = group.id,
-                                // A finished group leaves the to-do list, so the pager moves on by itself.
+                                // A finished stack leaves the to-do list, so the pager moves on by itself.
                                 onFinished = {},
                                 navigation = listNavigation,
                                 title = friendlyTime(group.startTime),
-                                position = "${page + 1} of ${groups.size}",
+                                position = "${page + 1} / ${groups.size}",
                             )
                         }
                     }
@@ -99,7 +108,9 @@ fun FeedRoute(
                 if (state.indexing || state.analyzing > 0) {
                     LinearProgressIndicator(
                         Modifier.align(Alignment.TopCenter).fillMaxWidth().windowInsetsPadding(WindowInsets.statusBars)
-                            .height(2.dp).testTag("feedIndexing"),
+                            .height(1.dp).testTag("feedIndexing"),
+                        color = Ink.Kept,
+                        trackColor = Color.Transparent,
                     )
                 }
             }
@@ -107,25 +118,42 @@ fun FeedRoute(
     }
 }
 
+/**
+ * What the feed (or the desktop's Sort screen) shows with nothing to sort: progress while the
+ * camera roll is still being read, otherwise "All caught up." with a tally. [extra] adds actions.
+ */
 @Composable
-private fun EmptyFeed(state: FeedUiState, onOpenList: () -> Unit, onShowAllTime: () -> Unit) {
-    val text = when {
-        state.analyzing > 0 -> "Analyzing your photos… ${state.analyzing} left. Groups of similar shots will show up here."
-        state.indexing -> "Looking for similar shots…"
-        state.showAllTime -> "Nothing to sort. Every group of similar shots is done."
-        else -> "Nothing to sort from the last 30 days."
-    }
-    Column(
-        Modifier.fillMaxSize().safeDrawingPadding().padding(32.dp).testTag("feedEmpty"),
-        verticalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterVertically),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        Text(text, style = MaterialTheme.typography.bodyLarge, textAlign = TextAlign.Center)
-        Spacer(Modifier.height(8.dp))
-        if (!state.showAllTime && state.analyzing == 0 && !state.indexing) {
-            Button(onClick = onShowAllTime, modifier = Modifier.testTag("feedAllTime")) { Text("Include older photos") }
+fun FeedEmpty(state: FeedUiState, onShowAllTime: () -> Unit, extra: @Composable () -> Unit = {}) {
+    when {
+        state.analyzing > 0 -> Moment(
+            title = "Getting ready.",
+            body = "Looking through your photos for similar shots. They show up here as they're found.",
+        ) { Readout("${state.analyzing} photos to go", color = Ink.Kept) }
+        state.indexing -> Moment(title = "Getting ready.", body = "Looking for similar shots.")
+        else -> Moment(
+            title = "All caught up.",
+            body = if (state.showAllTime) "New stacks show up as you take photos." else "Nothing left to sort from the last 30 days.",
+            ring = true,
+        ) {
+            if (state.sorted > 0 || state.trashed > 0) {
+                Row(horizontalArrangement = Arrangement.spacedBy(28.dp), modifier = Modifier.padding(vertical = 4.dp)) {
+                    Stat(state.sorted, "Sorted", Ink.Kept)
+                    Stat(state.trashed, "Trashed", Ink.Fg)
+                }
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                if (!state.showAllTime) PrimaryButton("Include older photos", onShowAllTime, Modifier.testTag("feedAllTime"))
+                extra()
+            }
         }
-        OutlinedButton(onClick = onOpenList, modifier = Modifier.testTag("feedOpenList")) { Text("Library") }
+    }
+}
+
+@Composable
+private fun Stat(value: Int, label: String, color: Color) {
+    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        Text("$value", style = MaterialTheme.typography.headlineSmall.copy(fontFamily = LocalBrandFonts.current.mono), color = color)
+        Readout(label, small = true)
     }
 }
 

@@ -27,6 +27,10 @@ data class FeedUiState(
     val indexing: Boolean = false,
     val analyzing: Int = 0,
     val loaded: Boolean = false,
+    /** Stacks finished so far, all time. */
+    val sorted: Int = 0,
+    /** Photos trashed from duels so far. */
+    val trashed: Int = 0,
 )
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -42,13 +46,17 @@ class FeedViewModel(
         groups.observeGroups(GroupStatus.UNRESOLVED, since).map { allTime to it }
     }
 
-    val state: StateFlow<FeedUiState> = combine(todo, indexer.state, groups.observeUnindexedCount()) { (allTime, list), index, unindexed ->
+    private val tally = combine(groups.observeCount(GroupStatus.DONE), settings.settings.map { it.trashedCount }.distinctUntilChanged()) { d, t -> d to t }
+
+    val state: StateFlow<FeedUiState> = combine(todo, indexer.state, groups.observeUnindexedCount(), tally) { (allTime, list), index, unindexed, (sorted, trashed) ->
         FeedUiState(
             groups = list,
             showAllTime = allTime,
             indexing = index == IndexState.Running,
             analyzing = unindexed,
             loaded = true,
+            sorted = sorted,
+            trashed = trashed,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), FeedUiState())
 

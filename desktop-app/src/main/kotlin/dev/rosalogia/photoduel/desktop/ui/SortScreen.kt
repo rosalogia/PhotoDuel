@@ -2,9 +2,13 @@ package dev.rosalogia.photoduel.desktop.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.hoverable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -18,11 +22,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
-import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
@@ -34,22 +35,27 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.PointerIcon
+import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.type
-import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.LocalViewModelStoreOwner
-import coil3.compose.AsyncImage
 import dev.rosalogia.photoduel.core.common.friendlyTime
 import dev.rosalogia.photoduel.core.data.PhotoGroup
+import dev.rosalogia.photoduel.core.ui.BrandIcons
+import dev.rosalogia.photoduel.core.ui.Ink
 import dev.rosalogia.photoduel.core.ui.KeyShortcuts
-import dev.rosalogia.photoduel.core.ui.PhotoRef
+import dev.rosalogia.photoduel.core.ui.PhotoThumb
+import dev.rosalogia.photoduel.core.ui.Readout
+import dev.rosalogia.photoduel.core.ui.SecondaryButton
 import dev.rosalogia.photoduel.core.ui.graphViewModel
 import dev.rosalogia.photoduel.feature.duel.DuelRoute
+import dev.rosalogia.photoduel.feature.duel.FeedEmpty
 import dev.rosalogia.photoduel.feature.duel.FeedViewModel
 
 /**
@@ -86,8 +92,11 @@ fun SortScreen(selected: Long?, onSelect: (Long?) -> Unit, onOpenLibrary: () -> 
     }
 
     Row(Modifier.fillMaxSize()) {
-        GroupList(groups, selected, onSelect, Modifier.width(300.dp).fillMaxHeight())
-        VerticalDivider()
+        // With nothing to sort, the message gets the whole width.
+        if (groups.isNotEmpty() || !state.loaded) {
+            GroupList(groups, selected, onSelect, Modifier.width(300.dp).fillMaxHeight())
+            Box(Modifier.width(1.dp).fillMaxHeight().background(Ink.Hair))
+        }
         Box(Modifier.weight(1f).fillMaxHeight()) {
             val index = groups.indexOfFirst { it.id == selected }
             if (index >= 0) {
@@ -99,12 +108,16 @@ fun SortScreen(selected: Long?, onSelect: (Long?) -> Unit, onOpenLibrary: () -> 
                             onFinished = {},
                             navigation = null,
                             title = friendlyTime(group.startTime),
-                            position = "${index + 1} of ${groups.size}",
+                            position = "${index + 1} / ${groups.size}",
                         )
                     }
                 }
             } else if (state.loaded) {
-                EmptySort(showAllTime = state.showAllTime, busy = state.indexing || state.analyzing > 0, onShowAllTime = viewModel::showAllTime, onOpenLibrary = onOpenLibrary)
+                Box(Modifier.fillMaxSize().padding(start = 40.dp), contentAlignment = Alignment.CenterStart) {
+                    FeedEmpty(state, onShowAllTime = viewModel::showAllTime) {
+                        SecondaryButton("Library", onOpenLibrary, icon = BrandIcons.Library)
+                    }
+                }
             }
         }
     }
@@ -122,12 +135,11 @@ private fun GroupList(groups: List<PhotoGroup>, selected: Long?, onSelect: (Long
         }
     }
     Column(modifier) {
-        Text(
-            "To do · ${groups.size} ${if (groups.size == 1) "group" else "groups"}",
-            style = MaterialTheme.typography.titleSmall,
-            modifier = Modifier.padding(16.dp),
+        Readout(
+            "To sort · ${groups.size} ${if (groups.size == 1) "stack" else "stacks"}",
+            Modifier.padding(start = 20.dp, top = 22.dp, bottom = 12.dp),
         )
-        LazyColumn(state = list, contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = 16.dp)) {
+        LazyColumn(state = list, contentPadding = PaddingValues(bottom = 16.dp)) {
             item(key = "header") { }
             itemsIndexed(groups, key = { _, g -> g.id }) { _, group ->
                 GroupRow(group, group.id == selected, onClick = { onSelect(group.id) })
@@ -138,48 +150,23 @@ private fun GroupList(groups: List<PhotoGroup>, selected: Long?, onSelect: (Long
 
 @Composable
 private fun GroupRow(group: PhotoGroup, selected: Boolean, onClick: () -> Unit) {
-    val bg = if (selected) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surface
+    val hover = remember { MutableInteractionSource() }
+    val hovered by hover.collectIsHoveredAsState()
     Column(
-        Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 2.dp).clip(RoundedCornerShape(10.dp))
-            .background(bg).clickable(onClick = onClick).padding(8.dp),
+        Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 2.dp).clip(RoundedCornerShape(12.dp))
+            .background(if (selected) Ink.Raised else if (hovered) Ink.Surface else Color.Transparent)
+            .hoverable(hover)
+            .pointerHoverIcon(PointerIcon.Hand)
+            .clickable(onClick = onClick)
+            .padding(10.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-            group.mediaIds.take(4).forEach { id ->
-                AsyncImage(
-                    model = PhotoRef(id),
-                    contentDescription = null,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.size(62.dp).clip(RoundedCornerShape(6.dp)).background(MaterialTheme.colorScheme.surfaceVariant),
-                )
-            }
+            group.mediaIds.take(4).forEach { id -> PhotoThumb(id, Modifier.size(60.dp), corner = 4.dp) }
         }
-        Spacer(Modifier.height(6.dp))
-        Text(
-            "${group.mediaIds.size} photos · ${friendlyTime(group.startTime)}",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(friendlyTime(group.startTime), style = MaterialTheme.typography.titleSmall, color = if (selected) Ink.Fg else Ink.Dim, modifier = Modifier.weight(1f))
+            Readout("${group.mediaIds.size}", small = true, color = if (selected) Ink.Kept else Ink.Faint)
+        }
     }
 }
-
-@Composable
-private fun EmptySort(showAllTime: Boolean, busy: Boolean, onShowAllTime: () -> Unit, onOpenLibrary: () -> Unit) {
-    Column(
-        Modifier.fillMaxSize().padding(32.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterVertically),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        Text(
-            when {
-                busy -> "Looking for similar shots. Groups will show up here."
-                showAllTime -> "Nothing to sort. Every group of similar shots is done."
-                else -> "Nothing to sort from the last 30 days."
-            },
-            style = MaterialTheme.typography.bodyLarge,
-            textAlign = TextAlign.Center,
-        )
-        if (!showAllTime && !busy) Button(onClick = onShowAllTime) { Text("Include older photos") }
-        OutlinedButton(onClick = onOpenLibrary) { Text("Library") }
-    }
-}
-

@@ -1,6 +1,7 @@
 package dev.rosalogia.photoduel.desktop.platform
 
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -8,9 +9,10 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import dev.rosalogia.photoduel.core.common.AppLog
+import dev.rosalogia.photoduel.core.ui.BrandIcons
+import dev.rosalogia.photoduel.core.ui.Ink
 import dev.rosalogia.photoduel.core.ui.PhotoActions
 import dev.rosalogia.photoduel.core.ui.ShareAction
-import dev.rosalogia.photoduel.desktop.ui.DesktopIcons
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
@@ -30,6 +32,10 @@ class DesktopPhotoActions(
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private class Confirm(val count: Int, val answer: CompletableDeferred<Boolean>)
     private var confirm by mutableStateOf<Confirm?>(null)
+
+    private val trashName = if (System.getProperty("os.name").startsWith("Windows")) "Recycle Bin" else "Trash"
+
+    override val trashNote = "Restorable from the $trashName"
 
     override suspend fun trash(ids: List<Long>): Boolean {
         val ask = Confirm(ids.size, CompletableDeferred())
@@ -52,7 +58,7 @@ class DesktopPhotoActions(
 
     override suspend fun favorite(ids: List<Long>) = false
 
-    override val share = ShareAction("Show in folder", DesktopIcons.Folder)
+    override val share = ShareAction("Show in folder", BrandIcons.Folder)
 
     override fun share(ids: List<Long>) = act(ids.firstOrNull()) { SystemFiles.reveal(it) }
 
@@ -77,8 +83,10 @@ class DesktopPhotoActions(
         AlertDialog(
             onDismissRequest = { answer(false) },
             title = { Text("Move $what to the trash?") },
-            text = { Text("You can restore them from the ${if (System.getProperty("os.name").startsWith("Windows")) "Recycle Bin" else "Trash"}.") },
-            confirmButton = { TextButton(onClick = { answer(true) }) { Text("Move to trash") } },
+            text = { Text("You can restore them from the $trashName.") },
+            confirmButton = {
+                TextButton(onClick = { answer(true) }, colors = ButtonDefaults.textButtonColors(contentColor = Ink.Trash)) { Text("Move to trash") }
+            },
             dismissButton = { TextButton(onClick = { answer(false) }) { Text("Cancel") } },
         )
     }

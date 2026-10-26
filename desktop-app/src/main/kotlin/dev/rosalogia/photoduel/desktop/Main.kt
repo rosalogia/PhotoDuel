@@ -2,6 +2,7 @@
 
 package dev.rosalogia.photoduel.desktop
 
+import dev.rosalogia.photoduel.core.ui.APP_NAME
 import androidx.compose.ui.res.painterResource
 import androidx.compose.runtime.remember
 import androidx.compose.ui.window.Window
@@ -42,7 +43,7 @@ fun main(args: Array<String>) {
                 saved.save(state)
                 exitApplication()
             },
-            title = "Photo Duel",
+            title = APP_NAME,
             state = state,
             icon = painterResource("icon.png"),
             onKeyEvent = shortcuts::dispatch,

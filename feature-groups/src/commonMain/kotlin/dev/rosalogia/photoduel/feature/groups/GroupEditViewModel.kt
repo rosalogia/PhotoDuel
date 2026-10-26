@@ -62,11 +62,11 @@ class GroupEditViewModel(
         neighbors.value = p?.let { groups.getGroup(it) } to n?.let { groups.getGroup(it) }
     }
 
-    fun remove(mediaId: Long) = edit("Removed from group") { editor.removePhoto(mediaId) }
+    fun remove(mediaId: Long) = edit("Taken out of this stack") { editor.removePhoto(mediaId) }
 
-    fun splitBefore(mediaId: Long) = edit("Split into two groups", close = true) { editor.splitBefore(groupId, mediaId) }
+    fun splitBefore(mediaId: Long) = edit("Split into two stacks", close = true) { editor.splitBefore(groupId, mediaId) }
 
-    fun mergeWith(otherGroupId: Long) = edit("Groups merged", close = true) { editor.merge(groupId, otherGroupId) }
+    fun mergeWith(otherGroupId: Long) = edit("Stacks merged", close = true) { editor.merge(groupId, otherGroupId) }
 
     private fun edit(message: String, close: Boolean = false, block: suspend () -> Unit) {
         if (busy.value) return

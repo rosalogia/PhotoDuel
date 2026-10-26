@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
@@ -19,21 +20,15 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -59,15 +54,24 @@ import androidx.compose.ui.input.pointer.util.VelocityTracker
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
 import dev.rosalogia.photoduel.core.common.AppLog
+import dev.rosalogia.photoduel.core.ui.BrandIconButton
+import dev.rosalogia.photoduel.core.ui.BrandIcons
+import dev.rosalogia.photoduel.core.ui.BrandTopBar
+import dev.rosalogia.photoduel.core.ui.FloatingBar
+import dev.rosalogia.photoduel.core.ui.Ink
 import dev.rosalogia.photoduel.core.ui.KeyShortcuts
-import dev.rosalogia.photoduel.core.ui.LocalDarkColors
+import dev.rosalogia.photoduel.core.ui.Moment
+import dev.rosalogia.photoduel.core.ui.PhotoStage
+import dev.rosalogia.photoduel.core.ui.PhotoTag
+import dev.rosalogia.photoduel.core.ui.PrimaryButton
+import dev.rosalogia.photoduel.core.ui.QuietButton
+import dev.rosalogia.photoduel.core.ui.Readout
+import dev.rosalogia.photoduel.core.ui.SecondaryButton
+import dev.rosalogia.photoduel.core.ui.rememberHaptics
 import dev.rosalogia.photoduel.core.ui.LocalMessages
 import dev.rosalogia.photoduel.core.ui.LocalPhotoActions
 import dev.rosalogia.photoduel.core.ui.PhotoRef
@@ -77,8 +81,9 @@ import kotlin.math.abs
 import kotlin.math.hypot
 import kotlinx.coroutines.launch
 
-private val KeepColor = Color(0xFF4CC38A)
-private val SkipColor = Color(0xFFE5484D)
+/** Keeping is the accent; skipping is quiet, since nothing is deleted. */
+private val KeepColor = Ink.Kept
+private val SkipColor = Ink.Fg
 
 @Composable
 fun HighlightSessionRoute(setId: Long, onClose: () -> Unit) {
@@ -92,16 +97,13 @@ fun HighlightSessionRoute(setId: Long, onClose: () -> Unit) {
             }
         }
     }
-    HighlightTheme {
+    PhotoStage {
         when (val s = state) {
-            HighlightUiState.Loading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
-            is HighlightUiState.Error -> Column(
-                Modifier.fillMaxSize().safeDrawingPadding().padding(32.dp),
-                verticalArrangement = Arrangement.Center,
-                horizontalAlignment = Alignment.CenterHorizontally,
-            ) {
-                Text(s.message, textAlign = TextAlign.Center)
-                TextButton(onClick = onClose) { Text("Back") }
+            HighlightUiState.Loading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator(Modifier.size(28.dp), color = Ink.Dim, strokeWidth = 1.5.dp)
+            }
+            is HighlightUiState.Error -> Box(Modifier.fillMaxSize().safeDrawingPadding(), contentAlignment = Alignment.Center) {
+                Moment("Can't open these highlights.", body = s.message) { QuietButton("Back", onClose, color = Ink.Fg) }
             }
             is HighlightUiState.Cull -> CullScreen(s, onClose, onDecide = viewModel::cull, onUndo = viewModel::undo)
             is HighlightUiState.PassDone -> PassDoneScreen(
@@ -126,14 +128,6 @@ fun HighlightSessionRoute(setId: Long, onClose: () -> Unit) {
     }
 }
 
-/** Photos read best on black, like the duel. */
-@Composable
-private fun HighlightTheme(content: @Composable () -> Unit) {
-    MaterialTheme(colorScheme = LocalDarkColors.current) {
-        Surface(color = Color.Black, contentColor = Color.White, modifier = Modifier.fillMaxSize(), content = content)
-    }
-}
-
 @Composable
 private fun TopBar(
     title: String,
@@ -143,20 +137,15 @@ private fun TopBar(
     titleTag: String = "highlightTitle",
     onTitleClick: (() -> Unit)? = null,
 ) {
-    Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-        IconButton(onClick = onClose) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back") }
-        Column(Modifier.weight(1f).then(if (onTitleClick != null) Modifier.clickable(onClick = onTitleClick) else Modifier)) {
-            Text(title, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.testTag(titleTag))
-            if (subtitle != null) {
-                Text(
-                    subtitle,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = Color.White.copy(alpha = 0.7f),
-                    modifier = Modifier.testTag("highlightSubtitle"),
-                )
-            }
-        }
-        if (undo != null) TextButton(onClick = undo, modifier = Modifier.testTag("undo")) { Text("Undo") }
+    BrandTopBar(
+        title = title,
+        subtitle = subtitle,
+        onBack = onClose,
+        titleTag = titleTag,
+        subtitleTag = "highlightSubtitle",
+        onTitleClick = onTitleClick,
+    ) {
+        if (undo != null) BrandIconButton(BrandIcons.Undo, "Undo", undo, Modifier.testTag("undo"))
     }
 }
 
@@ -170,14 +159,7 @@ private fun Photo(photo: HighlightPhoto, modifier: Modifier = Modifier, contentS
             modifier = Modifier.fillMaxSize(),
         )
         if (photo.burstSize > 1) {
-            Text(
-                "Best of ${photo.burstSize}",
-                style = MaterialTheme.typography.labelMedium,
-                color = Color.White,
-                modifier = Modifier.align(Alignment.BottomStart).padding(8.dp)
-                    .background(Color.Black.copy(alpha = 0.6f), RoundedCornerShape(50))
-                    .padding(horizontal = 10.dp, vertical = 4.dp),
-            )
+            PhotoTag("Best of ${photo.burstSize}", Ink.Fg, Modifier.align(Alignment.BottomStart).padding(10.dp))
         }
     }
 }
@@ -185,23 +167,10 @@ private fun Photo(photo: HighlightPhoto, modifier: Modifier = Modifier, contentS
 private fun picks(n: Int) = if (n == 1) "1 pick" else "$n picks"
 
 @Composable
-private fun Pill(text: String, color: Color, modifier: Modifier = Modifier) {
-    Text(
-        text,
-        color = Color.White,
-        fontWeight = FontWeight.SemiBold,
-        style = MaterialTheme.typography.labelLarge,
-        modifier = modifier
-            .background(Color.Black.copy(alpha = 0.6f), RoundedCornerShape(50))
-            .border(2.dp, color, RoundedCornerShape(50))
-            .padding(horizontal = 14.dp, vertical = 6.dp),
-    )
-}
-
-@Composable
 private fun CullScreen(state: HighlightUiState.Cull, onClose: () -> Unit, onDecide: (Boolean) -> Unit, onUndo: () -> Unit) {
     val threshold = with(LocalDensity.current) { 96.dp.toPx() }
     val scope = rememberCoroutineScope()
+    val haptics = rememberHaptics()
     // Reset per photo, so the next card starts centered.
     val offset = remember(state.current.mediaId) { Animatable(0f) }
     var width by remember { mutableStateOf(1000f) }
@@ -212,6 +181,7 @@ private fun CullScreen(state: HighlightUiState.Cull, onClose: () -> Unit, onDeci
     fun decide(keep: Boolean) {
         if (deciding) return
         deciding = true
+        if (keep) haptics.confirm() else haptics.tick()
         scope.launch {
             offset.animateTo(if (keep) width * 1.2f else -width * 1.2f)
             onDecide(keep)
@@ -230,14 +200,16 @@ private fun CullScreen(state: HighlightUiState.Cull, onClose: () -> Unit, onDeci
     Column(Modifier.fillMaxSize().safeDrawingPadding()) {
         TopBar(
             title = if (state.pass == 1) "Quick pass" else "Quick pass ${state.pass}",
-            subtitle = "${state.position + 1} of ${state.total} · ${state.kept} kept · aiming for ${state.target}",
+            subtitle = "${state.position + 1} / ${state.total} · ${state.kept} kept · aiming for ${state.target}" +
+                if (state.current.burstSize > 1) " · best of ${state.current.burstSize}" else "",
             onClose = onClose,
             undo = if (state.canUndo) onUndo else null,
         )
         Box(Modifier.weight(1f).fillMaxWidth().padding(8.dp)) {
-            state.next?.let { Photo(it, Modifier.fillMaxSize().graphicsLayer { alpha = 0.35f }) }
+            state.next?.let { Photo(it.copy(burstSize = 1), Modifier.fillMaxSize().graphicsLayer { alpha = 0.35f }) }
             Photo(
-                state.current,
+                // Its burst size is in the title bar, which stays put while the photo moves.
+                state.current.copy(burstSize = 1),
                 Modifier.fillMaxSize().testTag("cullPhoto")
                     .graphicsLayer {
                         width = size.width
@@ -279,7 +251,7 @@ private fun CullScreen(state: HighlightUiState.Cull, onClose: () -> Unit, onDeci
             )
             if (abs(offset.value) > threshold * 0.3f) {
                 val keep = offset.value > 0
-                Pill(
+                PhotoTag(
                     if (keep) "Keep" else "Skip",
                     if (keep) KeepColor else SkipColor,
                     Modifier.align(if (keep) Alignment.TopStart else Alignment.TopEnd).padding(16.dp)
@@ -287,17 +259,12 @@ private fun CullScreen(state: HighlightUiState.Cull, onClose: () -> Unit, onDeci
                 )
             }
         }
-        Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            OutlinedButton(
-                onClick = { decide(false) },
-                modifier = Modifier.weight(1f).height(56.dp).testTag("skip"),
-                colors = ButtonDefaults.outlinedButtonColors(contentColor = SkipColor),
-            ) { Text("← Skip") }
-            OutlinedButton(
-                onClick = { decide(true) },
-                modifier = Modifier.weight(1f).height(56.dp).testTag("keep"),
-                colors = ButtonDefaults.outlinedButtonColors(contentColor = KeepColor),
-            ) { Text("Keep →") }
+        Box(Modifier.fillMaxWidth().padding(start = 12.dp, end = 12.dp, bottom = 12.dp), contentAlignment = Alignment.Center) {
+            FloatingBar {
+                BarAction("← Skip", SkipColor, Modifier.testTag("skip")) { decide(false) }
+                Box(Modifier.width(1.dp).height(28.dp).background(Ink.Hair))
+                BarAction("Keep →", KeepColor, Modifier.testTag("keep")) { decide(true) }
+            }
         }
     }
 }
@@ -316,8 +283,8 @@ private fun PassDoneScreen(
     Column(Modifier.fillMaxSize().safeDrawingPadding()) {
         TopBar(title = state.name, subtitle = null, onClose = onClose, undo = onUndo)
         Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 8.dp)) {
-            Text("You kept $kept of ${state.reviewed}", style = MaterialTheme.typography.headlineSmall, modifier = Modifier.testTag("passSummary"))
-            Spacer(Modifier.height(4.dp))
+            Text("You kept $kept of ${state.reviewed}.", style = MaterialTheme.typography.displaySmall, modifier = Modifier.testTag("passSummary"))
+            Spacer(Modifier.height(8.dp))
             Text(
                 when {
                     kept == 0 -> "Nothing kept this time."
@@ -326,27 +293,24 @@ private fun PassDoneScreen(
                     else -> "Exactly the ${state.target} you were aiming for."
                 },
                 style = MaterialTheme.typography.bodyMedium,
-                color = Color.White.copy(alpha = 0.75f),
+                color = Ink.Dim,
             )
         }
         FittingGrid(state.kept, key = { it.mediaId }, modifier = Modifier.weight(1f).fillMaxWidth()) { photo, tile ->
-            Photo(photo.copy(burstSize = 1), tile.clip(RoundedCornerShape(6.dp)), ContentScale.Crop)
+            Photo(photo.copy(burstSize = 1), tile.clip(RoundedCornerShape(4.dp)), ContentScale.Crop)
         }
-        Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Column(
+            Modifier.align(Alignment.CenterHorizontally).widthIn(max = 600.dp).fillMaxWidth().padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
             when {
-                kept == 0 -> Button(onClick = onStartOver, modifier = Modifier.fillMaxWidth().testTag("startOver")) { Text("Start over") }
+                kept == 0 -> PrimaryButton("Start over", onStartOver, Modifier.fillMaxWidth().testTag("startOver"))
                 kept > state.target -> {
-                    Button(onClick = onTrim, modifier = Modifier.fillMaxWidth().testTag("trim")) {
-                        Text("Narrow down head to head (about ${picks(state.estimatedPicks)})")
-                    }
-                    OutlinedButton(onClick = onAnotherPass, modifier = Modifier.fillMaxWidth().testTag("anotherPass")) {
-                        Text("Another quick pass through these $kept")
-                    }
-                    TextButton(onClick = onUseKept, modifier = Modifier.fillMaxWidth().testTag("useKept")) { Text("Keep all $kept") }
+                    PrimaryButton("Duel down to ${state.target} · about ${picks(state.estimatedPicks)}", onTrim, Modifier.fillMaxWidth().testTag("trim"))
+                    SecondaryButton("Another quick pass through these $kept", onAnotherPass, Modifier.fillMaxWidth().testTag("anotherPass"))
+                    QuietButton("Keep all $kept", onUseKept, Modifier.fillMaxWidth().testTag("useKept"))
                 }
-                else -> Button(onClick = onUseKept, modifier = Modifier.fillMaxWidth().testTag("useKept")) {
-                    Text(if (kept == 1) "Use this one" else "Use these $kept")
-                }
+                else -> PrimaryButton(if (kept == 1) "Use this one" else "Use these $kept", onUseKept, Modifier.fillMaxWidth().testTag("useKept"))
             }
         }
     }
@@ -368,8 +332,8 @@ private fun TrimScreen(state: HighlightUiState.Trim, onClose: () -> Unit, onPick
     Box(Modifier.fillMaxSize()) {
         Column(Modifier.fillMaxSize().safeDrawingPadding()) {
             TopBar(
-                title = "Which one is better?",
-                subtitle = "${state.stillIn} still in, keeping ${state.target} · about ${picks(state.picksLeft)} left",
+                title = "Which is better?",
+                subtitle = "${state.stillIn} still in · keeping ${state.target} · about ${picks(state.picksLeft)} left",
                 onClose = onClose,
                 undo = if (state.canUndo) onUndo else null,
             )
@@ -381,8 +345,8 @@ private fun TrimScreen(state: HighlightUiState.Trim, onClose: () -> Unit, onPick
                         Photo(
                             photo,
                             slot.padding(horizontal = 8.dp, vertical = 4.dp)
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(Color.White.copy(alpha = 0.06f))
+                                .clip(RoundedCornerShape(6.dp))
+                                .background(Ink.Surface)
                                 .testTag(if (i == 0) "pickFirst" else "pickSecond")
                                 .pointerInput(photo.mediaId) {
                                     detectTapGestures(
@@ -404,12 +368,11 @@ private fun TrimScreen(state: HighlightUiState.Trim, onClose: () -> Unit, onPick
                     Column(Modifier.fillMaxSize()) { photos(Modifier.weight(1f).fillMaxWidth()) }
                 }
             }
-            Text(
-                if (keys) "Click the better one, or press ← / → · hold to see it full size" else "Tap the better one · hold to see it full screen",
-                style = MaterialTheme.typography.bodySmall,
-                color = Color.White.copy(alpha = 0.6f),
-                textAlign = TextAlign.Center,
-                modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+            Readout(
+                if (keys) "Click the better one · ← → · hold to see it full size" else "Tap the better one · hold to see it full screen",
+                Modifier.align(Alignment.CenterHorizontally).padding(vertical = 12.dp),
+                small = true,
+                color = Ink.Faint,
             )
         }
         peek?.let { Photo(it, Modifier.fillMaxSize().background(Color.Black).safeDrawingPadding()) }
@@ -430,6 +393,7 @@ private fun ResultScreen(
         var text by remember { mutableStateOf(state.name) }
         AlertDialog(
             onDismissRequest = { renaming = false },
+            containerColor = Ink.Raised,
             title = { Text("Rename") },
             text = {
                 Column {
@@ -437,6 +401,7 @@ private fun ResultScreen(
                     Text(
                         "Also the album's folder name for photos copied from now on.",
                         style = MaterialTheme.typography.bodySmall,
+                        color = Ink.Dim,
                         modifier = Modifier.padding(top = 8.dp),
                     )
                 }
@@ -447,7 +412,7 @@ private fun ResultScreen(
                     renaming = false
                 }, enabled = text.isNotBlank()) { Text("Save") }
             },
-            dismissButton = { TextButton(onClick = { renaming = false }) { Text("Cancel") } },
+            dismissButton = { TextButton(onClick = { renaming = false }, colors = ButtonDefaults.textButtonColors(contentColor = Ink.Fg)) { Text("Cancel") } },
         )
     }
     val actions = LocalPhotoActions.current
@@ -471,35 +436,36 @@ private fun ResultScreen(
         ) { photo, tile ->
             Photo(
                 photo.copy(burstSize = 1),
-                tile.clip(RoundedCornerShape(6.dp)).clickable { actions.open(photo.mediaId) },
+                tile.clip(RoundedCornerShape(4.dp)).clickable { actions.open(photo.mediaId) },
                 ContentScale.Crop,
             )
         }
-        Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Column(
+            Modifier.align(Alignment.CenterHorizontally).widthIn(max = 600.dp).fillMaxWidth().padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
             val allCopied = state.copied == ids.size
-            Button(
-                onClick = onCopy,
-                enabled = state.copying == null,
-                modifier = Modifier.fillMaxWidth().testTag("copyToAlbum"),
-            ) {
-                Text(
+            if (allCopied) {
+                // Already done: a quiet confirmation that still opens the copy again if pressed.
+                val album = state.albumPath.trimEnd('/', '\\').substringAfterLast('/').substringAfterLast('\\')
+                SecondaryButton("In album “$album”", onCopy, Modifier.fillMaxWidth().testTag("copyToAlbum"), icon = BrandIcons.Check)
+            } else {
+                PrimaryButton(
                     when {
                         state.copying != null -> "Copying ${state.copying + 1} of ${ids.size}…"
-                        allCopied -> "In album ${state.albumPath.trimEnd('/', '\\')} ✓"
                         state.copied > 0 -> "Copy the rest to the album"
                         else -> "Copy to album"
                     },
-                    maxLines = 1,
+                    onClick = onCopy,
+                    enabled = state.copying == null,
+                    modifier = Modifier.fillMaxWidth().testTag("copyToAlbum"),
                 )
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedButton(onClick = { actions.share(ids) }, modifier = Modifier.weight(1f).testTag("shareAll")) {
-                    Icon(actions.share.icon, contentDescription = null)
-                    Spacer(Modifier.width(6.dp))
-                    Text(actions.share.label)
-                }
+                SecondaryButton(actions.share.label, onClick = { actions.share(ids) }, icon = actions.share.icon, modifier = Modifier.weight(1f).testTag("shareAll"))
                 if (actions.canFavorite) {
-                    OutlinedButton(
+                    SecondaryButton(
+                        "Favorite",
                         onClick = {
                             scope.launch {
                                 val ok = actions.favorite(ids)
@@ -507,16 +473,22 @@ private fun ResultScreen(
                                 if (ok) onFavorited()
                             }
                         },
+                        icon = BrandIcons.Heart,
                         modifier = Modifier.weight(1f).testTag("favoriteAll"),
-                    ) {
-                        Icon(Icons.Filled.Favorite, contentDescription = null)
-                        Spacer(Modifier.width(6.dp))
-                        Text("Favorite")
-                    }
+                    )
                 }
             }
         }
     }
+}
+
+/** One half of the quick pass's bar. */
+@Composable
+private fun RowScope.BarAction(label: String, color: Color, modifier: Modifier = Modifier, onClick: () -> Unit) {
+    Box(
+        modifier.weight(1f).fillMaxHeight().padding(vertical = 4.dp).clip(RoundedCornerShape(28.dp)).clickable(onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) { Text(label, style = MaterialTheme.typography.labelLarge, color = color) }
 }
 
 private fun androidx.compose.ui.input.key.KeyEvent.isUndo() =

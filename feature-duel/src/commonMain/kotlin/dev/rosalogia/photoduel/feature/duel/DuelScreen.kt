@@ -1,34 +1,33 @@
 package dev.rosalogia.photoduel.feature.duel
 
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.waitForUpOrCancellation
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -36,10 +35,14 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -52,32 +55,42 @@ import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import dev.rosalogia.photoduel.core.ui.BrandIconButton
+import dev.rosalogia.photoduel.core.ui.BrandIcons
+import dev.rosalogia.photoduel.core.ui.BrandTopBar
+import dev.rosalogia.photoduel.core.ui.FloatingBar
+import dev.rosalogia.photoduel.core.ui.Ink
 import dev.rosalogia.photoduel.core.ui.KeyShortcuts
-import dev.rosalogia.photoduel.core.ui.LocalDarkColors
 import dev.rosalogia.photoduel.core.ui.LocalMessages
+import dev.rosalogia.photoduel.core.ui.Moment
+import dev.rosalogia.photoduel.core.ui.PhotoStage
+import dev.rosalogia.photoduel.core.ui.PhotoTag
+import dev.rosalogia.photoduel.core.ui.QuietButton
+import dev.rosalogia.photoduel.core.ui.Readout
+import dev.rosalogia.photoduel.core.ui.StepProgress
 import dev.rosalogia.photoduel.core.ui.graphViewModel
 import dev.rosalogia.photoduel.core.ui.hasShortcuts
+import dev.rosalogia.photoduel.core.ui.rememberHaptics
+import kotlinx.coroutines.launch
 import kotlin.math.abs
 
-val KingColor = Color(0xFF4C8DF6)
-val ChallengerColor = Color(0xFFFF9F1C)
+/** Your pick is framed in the accent; the challenger in plain white. */
+val KingColor = Ink.Kept
+val ChallengerColor = Ink.Challenger
 
-/** How the duel's top-left button behaves: a plain back arrow, or the feed's way to the list. */
+/** How the duel's top-left button behaves: a plain back arrow, or the feed's way to the library. */
 data class DuelNavigation(
-    val icon: ImageVector = Icons.AutoMirrored.Filled.ArrowBack,
+    val icon: ImageVector = BrandIcons.Back,
     val label: String = "Back",
     val onClick: () -> Unit,
 )
 
 /**
- * One group's duel. [onFinished] runs when the group is done or dissolved. [title] names the group,
- * such as when it was taken; [position] is where it sits in a list, such as "3 of 9".
+ * One stack's duel. [onFinished] runs when the stack is done or dissolved. [title] names the stack,
+ * such as when it was taken; [position] is where it sits in a list, such as "3 / 9".
  */
 @Composable
 fun DuelRoute(
@@ -100,9 +113,9 @@ fun DuelRoute(
             }
         }
     }
-    DuelTheme {
+    PhotoStage {
         when (val s = state) {
-            DuelUiState.Loading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
+            DuelUiState.Loading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Spinner() }
             is DuelUiState.Error -> ErrorView(s.message, navigation)
             is DuelUiState.Dueling -> DuelScreen(
                 s,
@@ -116,7 +129,7 @@ fun DuelRoute(
             is DuelUiState.Result -> ResultScreen(
                 state = s,
                 navigation = navigation,
-                subtitle = listOfNotNull(title, position?.let { "group $it" }).joinToString(" · ").ifEmpty { null },
+                subtitle = listOfNotNull(title, position?.let { "Stack $it" }).joinToString(" · ").ifEmpty { null },
                 onUndo = viewModel::undo,
                 onPickRunnerUp = viewModel::pickRunnerUp,
                 onDone = viewModel::markDone,
@@ -128,55 +141,18 @@ fun DuelRoute(
     }
 }
 
-/** Photos read best on black, so the duel flow is always dark regardless of the system theme. */
+/** A thin, quiet loading indicator. */
 @Composable
-fun DuelTheme(content: @Composable () -> Unit) {
-    MaterialTheme(colorScheme = LocalDarkColors.current) {
-        Surface(color = Color.Black, contentColor = Color.White, modifier = Modifier.fillMaxSize(), content = content)
-    }
-}
-
-/** The top-left button plus a title with an optional second line, shared by the duel and result. */
-@Composable
-internal fun DuelTopBar(
-    title: String,
-    subtitle: String?,
-    navigation: DuelNavigation?,
-    titleTag: String,
-    actions: @Composable () -> Unit = {},
-) {
-    Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-        if (navigation != null) {
-            IconButton(onClick = navigation.onClick, modifier = Modifier.testTag("duelNav")) {
-                Icon(navigation.icon, contentDescription = navigation.label)
-            }
-        } else {
-            Spacer(Modifier.width(12.dp))
-        }
-        Column(Modifier.weight(1f)) {
-            Text(title, style = MaterialTheme.typography.titleMedium, modifier = Modifier.testTag(titleTag))
-            if (subtitle != null) {
-                Text(
-                    subtitle,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = Color.White.copy(alpha = 0.7f),
-                    modifier = Modifier.testTag("duelSubtitle"),
-                )
-            }
-        }
-        actions()
-    }
+internal fun Spinner() {
+    CircularProgressIndicator(Modifier.size(28.dp), color = Ink.Dim, strokeWidth = 1.5.dp, trackColor = Color.Transparent)
 }
 
 @Composable
 private fun ErrorView(message: String, navigation: DuelNavigation?) {
-    Column(
-        Modifier.fillMaxSize().safeDrawingPadding().padding(32.dp),
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        Text(message, textAlign = TextAlign.Center)
-        if (navigation != null) TextButton(onClick = navigation.onClick) { Text(navigation.label) }
+    Box(Modifier.fillMaxSize().safeDrawingPadding(), contentAlignment = Alignment.Center) {
+        Moment(title = "Can't open this stack.", body = message) {
+            if (navigation != null) QuietButton(navigation.label, navigation.onClick, color = Ink.Fg)
+        }
     }
 }
 
@@ -191,20 +167,31 @@ fun DuelScreen(
     onKeepBoth: () -> Unit,
 ) {
     val zoom = remember { ZoomState() }
+    val haptics = rememberHaptics()
+    val scope = rememberCoroutineScope()
     var showChallenger by remember { mutableStateOf(false) }
     // Per matchup: how many times the user flipped before deciding.
     var flips by remember(state.matchup) { mutableIntStateOf(0) }
     var dragX by remember { mutableFloatStateOf(0f) }
     val swipeThreshold = with(LocalDensity.current) { 96.dp.toPx() }
+    // The frame thickens for a moment after each pick.
+    val pulse = remember { Animatable(0f) }
 
     fun setFlip(on: Boolean) {
-        if (on && !showChallenger) flips++
+        if (on == showChallenger) return
+        if (on) flips++
         showChallenger = on
+        haptics.tick()
     }
 
     fun pick(keepChallenger: Boolean) {
         showChallenger = false
         dragX = 0f
+        haptics.confirm()
+        scope.launch {
+            pulse.snapTo(1f)
+            pulse.animateTo(0f, tween(360))
+        }
         onPick(keepChallenger, flips)
     }
 
@@ -228,36 +215,40 @@ fun DuelScreen(
         }
     }
     val keys = hasShortcuts
+    // Everything but the photo steps back while you compare.
+    val chrome by animateFloatAsState(if (showChallenger) 0.3f else 1f, tween(140))
 
-    val edge = if (showChallenger) ChallengerColor else KingColor
     Column(Modifier.fillMaxSize().safeDrawingPadding()) {
         val photos = state.matchup.totalSteps + 1
-        DuelTopBar(
-            title = if (state.round == Round.RUNNER_UP) "Pick a runner-up" else title ?: "Pick the better shot",
-            subtitle = listOfNotNull(
-                if (state.round == Round.MAIN) "$photos photos" else title,
-                position?.let { "group $it" },
-            ).joinToString(" · "),
-            navigation = navigation,
-            titleTag = "duelTitle",
-        ) {
-            if (state.round == Round.MAIN) {
-                TextButton(onClick = onKeepBoth, enabled = state.ready, modifier = Modifier.testTag("keepBoth")) { Text("Keep both") }
+        Column(Modifier.alpha(chrome)) {
+            BrandTopBar(
+                title = if (state.round == Round.RUNNER_UP) "Pick a runner-up" else title ?: "Pick the better shot",
+                subtitle = listOfNotNull(
+                    position?.let { "Stack $it" },
+                    if (state.round == Round.MAIN) "$photos photos" else title,
+                ).joinToString(" · "),
+                onBack = navigation?.onClick,
+                backIcon = navigation?.icon ?: BrandIcons.Back,
+                backLabel = navigation?.label ?: "Back",
+                backTag = "duelNav",
+                titleTag = "duelTitle",
+                subtitleTag = "duelSubtitle",
+            ) {
+                if (state.round == Round.MAIN) {
+                    QuietButton("Keep both", onKeepBoth, enabled = state.ready, modifier = Modifier.testTag("keepBoth"))
+                }
+                BrandIconButton(BrandIcons.Undo, "Undo", onUndo, Modifier.testTag("undo"), enabled = state.canUndo)
             }
-            TextButton(onClick = onUndo, enabled = state.canUndo, modifier = Modifier.testTag("undo")) { Text("Undo") }
+            StepProgress(
+                step = state.matchup.step,
+                total = state.matchup.totalSteps,
+                modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 2.dp).testTag("duelProgress"),
+            )
         }
-        StepProgress(
-            step = state.matchup.step,
-            total = state.matchup.totalSteps,
-            modifier = Modifier.fillMaxWidth().padding(start = 12.dp, end = 12.dp, top = 2.dp, bottom = 8.dp).testTag("duelProgress"),
-        )
 
-        Box(
-            Modifier.weight(1f).fillMaxWidth().padding(horizontal = 8.dp)
-                .border(3.dp, edge, RoundedCornerShape(6.dp))
-                .padding(3.dp),
-        ) {
+        Box(Modifier.weight(1f).fillMaxWidth().padding(horizontal = 6.dp, vertical = 12.dp)) {
             if (state.ready) {
+                val edge = if (showChallenger) ChallengerColor else KingColor
                 FlipView(
                     king = state.king!!,
                     challenger = state.challenger!!,
@@ -268,111 +259,101 @@ fun DuelScreen(
                     onPress = ::setFlip,
                     onSwipe = { keepChallenger -> pick(keepChallenger) },
                     onDrag = { dragX = it },
+                    frameColor = edge,
+                    frameWidth = 2.dp + 3.dp * pulse.value,
+                    tag = {
+                        PhotoTag(
+                            if (showChallenger) "Challenger" else "Yours",
+                            edge,
+                            Modifier.testTag("flipLabel"),
+                        )
+                    },
                     modifier = Modifier.fillMaxSize().graphicsLayer { translationX = dragX * 0.4f },
                 )
             } else {
-                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Spinner() }
             }
-            Label(
-                text = if (showChallenger) "Challenger" else "Current pick",
-                color = edge,
-                modifier = Modifier.align(Alignment.TopCenter).padding(top = 12.dp).testTag("flipLabel"),
-            )
             if (abs(dragX) > swipeThreshold * 0.3f) {
                 val right = dragX > 0
-                Label(
-                    text = if (right) "Keep challenger →" else "← Keep current pick",
-                    color = if (right) ChallengerColor else KingColor,
-                    modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 24.dp)
+                PhotoTag(
+                    if (right) "Keep challenger →" else "← Keep yours",
+                    if (right) ChallengerColor else KingColor,
+                    Modifier.align(Alignment.BottomCenter).padding(bottom = 20.dp)
                         .graphicsLayer { alpha = (abs(dragX) / swipeThreshold).coerceIn(0.3f, 1f) },
                 )
             }
         }
 
-        Row(
-            Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 12.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.CenterVertically,
+        Column(
+            Modifier.fillMaxWidth().padding(start = 12.dp, end = 12.dp, bottom = 12.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            OutlinedButton(
-                onClick = { pick(keepChallenger = false) },
-                enabled = state.ready,
-                modifier = Modifier.weight(1f).testTag("keepKing"),
-                colors = ButtonDefaults.outlinedButtonColors(contentColor = KingColor),
-                contentPadding = PaddingValues(horizontal = 4.dp, vertical = 8.dp),
-            ) { Text(if (keys) "← Keep\ncurrent" else "Keep\ncurrent", textAlign = TextAlign.Center, maxLines = 2, softWrap = false) }
-            HoldButton(
-                enabled = state.ready,
-                held = showChallenger,
-                label = if (keys) "Hold to compare\nor hold Space" else "Hold to compare",
-                onPress = ::setFlip,
-                modifier = Modifier.weight(1.3f).height(64.dp).testTag("hold"),
-            )
-            OutlinedButton(
-                onClick = { pick(keepChallenger = true) },
-                enabled = state.ready,
-                modifier = Modifier.weight(1f).testTag("keepChallenger"),
-                colors = ButtonDefaults.outlinedButtonColors(contentColor = ChallengerColor),
-                contentPadding = PaddingValues(horizontal = 4.dp, vertical = 8.dp),
-            ) { Text(if (keys) "Keep →\nchallenger" else "Keep\nchallenger", textAlign = TextAlign.Center, maxLines = 2, softWrap = false) }
-        }
-    }
-}
-
-/** One segment per decision in this group: done ones filled, the current one lit, so "how much is left" reads at a glance. */
-@Composable
-private fun StepProgress(step: Int, total: Int, modifier: Modifier = Modifier) {
-    Row(
-        modifier.semantics { contentDescription = "Pick ${step + 1} of $total" },
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
-    ) {
-        repeat(total) { i ->
-            val color = when {
-                i < step -> Color.White.copy(alpha = 0.7f)
-                i == step -> KingColor
-                else -> Color.White.copy(alpha = 0.18f)
+            FloatingBar(Modifier.alpha(0.5f + chrome / 2)) {
+                PickButton("← Keep", "Yours", KingColor, state.ready, Modifier.testTag("keepKing")) { pick(keepChallenger = false) }
+                HoldButton(
+                    enabled = state.ready,
+                    held = showChallenger,
+                    onPress = ::setFlip,
+                    modifier = Modifier.testTag("hold"),
+                )
+                PickButton("Keep →", "Challenger", ChallengerColor, state.ready, Modifier.testTag("keepChallenger")) {
+                    pick(keepChallenger = true)
+                }
             }
-            Box(Modifier.weight(1f).height(4.dp).background(color, RoundedCornerShape(2.dp)))
+            if (keys) Readout("Hold space to compare · ← → keep · B both · Z undo", small = true, color = Ink.Faint)
         }
     }
 }
 
+/** One side of the bar: what it does on top, whose photo it keeps underneath. */
 @Composable
-private fun Label(text: String, color: Color, modifier: Modifier = Modifier) {
-    Text(
-        text,
-        color = Color.White,
-        fontWeight = FontWeight.SemiBold,
-        style = MaterialTheme.typography.labelLarge,
-        modifier = modifier
-            .background(Color.Black.copy(alpha = 0.6f), RoundedCornerShape(50))
-            .border(2.dp, color, RoundedCornerShape(50))
-            .padding(horizontal = 14.dp, vertical = 6.dp),
-    )
+private fun RowScope.PickButton(
+    label: String,
+    whose: String,
+    color: Color,
+    enabled: Boolean,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit,
+) {
+    Column(
+        modifier.weight(1f).fillMaxHeight().padding(vertical = 4.dp).clip(RoundedCornerShape(28.dp)).clickable(enabled = enabled, onClick = onClick),
+        verticalArrangement = Arrangement.Center,
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Text(label, style = MaterialTheme.typography.labelLarge, color = if (enabled) color else Ink.Faint)
+        Readout(whose, small = true, color = if (enabled) color.copy(alpha = 0.6f) else Ink.Faint)
+    }
 }
 
-/** A large button that shows the challenger for as long as it is held; lit while [held], however that happens. */
+/** A white pill that shows the challenger for as long as it's held; outlined while held, however that happens. */
 @Composable
-private fun HoldButton(enabled: Boolean, held: Boolean, label: String, onPress: (Boolean) -> Unit, modifier: Modifier = Modifier) {
-    Box(
+private fun HoldButton(enabled: Boolean, held: Boolean, onPress: (Boolean) -> Unit, modifier: Modifier = Modifier) {
+    val shape = RoundedCornerShape(28.dp)
+    val press by rememberUpdatedState(onPress)
+    Row(
         modifier
-            .background(if (held) ChallengerColor else Color.White.copy(alpha = if (enabled) 0.15f else 0.05f), RoundedCornerShape(32.dp))
+            .height(52.dp)
+            .scale(if (held) 0.96f else 1f)
+            .then(
+                if (held) Modifier.border(1.5.dp, Color.White, shape)
+                else Modifier.background(if (enabled) Color.White else Ink.Raised, shape),
+            )
             .pointerInput(enabled) {
                 if (!enabled) return@pointerInput
                 awaitEachGesture {
                     awaitFirstDown()
-                    onPress(true)
+                    press(true)
                     waitForUpOrCancellation()
-                    onPress(false)
+                    press(false)
                 }
-            },
-        contentAlignment = Alignment.Center,
+            }
+            .padding(horizontal = 18.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(
-            label,
-            color = if (held) Color.Black else Color.White,
-            fontWeight = FontWeight.SemiBold,
-            textAlign = TextAlign.Center,
-        )
+        val content = if (held) Color.White else if (enabled) Ink.Black else Ink.Faint
+        Icon(BrandIcons.Pair, contentDescription = null, tint = content, modifier = Modifier.size(18.dp))
+        Spacer(Modifier.width(8.dp))
+        Text("Hold to compare", style = MaterialTheme.typography.labelLarge, color = content, textAlign = TextAlign.Center, maxLines = 1)
     }
 }

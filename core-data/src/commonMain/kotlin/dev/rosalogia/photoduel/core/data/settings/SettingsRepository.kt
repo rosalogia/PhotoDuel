@@ -5,6 +5,7 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.floatPreferencesKey
+import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
@@ -17,6 +18,8 @@ data class Settings(
     val showAllTime: Boolean = false,
     /** Pass 2 grouping: average embedding similarity needed to group two shots. */
     val similarityThreshold: Float = 0.75f,
+    /** Photos moved to the trash from a duel, for the tally on the "All caught up" screen. */
+    val trashedCount: Int = 0,
 )
 
 /** [dataStore] is the "settings" preferences file (on Android, the one preferencesDataStore("settings") used). */
@@ -27,6 +30,7 @@ class SettingsRepository(
         val sessionGapMs = longPreferencesKey("session_gap_ms")
         val showAllTime = booleanPreferencesKey("show_all_time")
         val similarityThreshold = floatPreferencesKey("similarity_threshold")
+        val trashedCount = intPreferencesKey("trashed_count")
     }
 
     val settings: Flow<Settings> = dataStore.data.map { p ->
@@ -35,6 +39,7 @@ class SettingsRepository(
             sessionGapMs = p[Keys.sessionGapMs] ?: defaults.sessionGapMs,
             showAllTime = p[Keys.showAllTime] ?: defaults.showAllTime,
             similarityThreshold = p[Keys.similarityThreshold] ?: defaults.similarityThreshold,
+            trashedCount = p[Keys.trashedCount] ?: defaults.trashedCount,
         )
     }
 
@@ -46,6 +51,10 @@ class SettingsRepository(
 
     suspend fun setSimilarityThreshold(value: Float) {
         dataStore.edit { it[Keys.similarityThreshold] = value }
+    }
+
+    suspend fun addTrashed(count: Int) {
+        dataStore.edit { it[Keys.trashedCount] = (it[Keys.trashedCount] ?: 0) + count }
     }
 
     suspend fun setSessionGapMs(value: Long) {

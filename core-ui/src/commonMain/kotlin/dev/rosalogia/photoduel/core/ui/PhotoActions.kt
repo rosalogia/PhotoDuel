@@ -11,6 +11,9 @@ interface PhotoActions {
     /** Moves [ids] to the system trash; false if the user cancelled. Restorable from the trash. */
     suspend fun trash(ids: List<Long>): Boolean
 
+    /** A few words on getting trashed photos back, shown under the trash button. */
+    val trashNote: String
+
     /** False where the platform has no notion of favorites; then the UI hides the action. */
     val canFavorite: Boolean
 

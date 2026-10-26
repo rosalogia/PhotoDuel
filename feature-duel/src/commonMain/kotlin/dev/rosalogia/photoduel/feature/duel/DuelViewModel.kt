@@ -9,6 +9,7 @@ import dev.rosalogia.photoduel.core.data.GroupEditor
 import dev.rosalogia.photoduel.core.data.GroupRepository
 import dev.rosalogia.photoduel.core.data.PhotoGroup
 import dev.rosalogia.photoduel.core.data.PreScoreRepository
+import dev.rosalogia.photoduel.core.data.settings.SettingsRepository
 import dev.rosalogia.photoduel.core.data.db.GroupStatus
 import dev.rosalogia.photoduel.core.ml.FaceAnalyzer
 import dev.rosalogia.photoduel.core.ml.NormRect
@@ -78,6 +79,7 @@ class DuelViewModel(
     private val preScores: PreScoreRepository,
     private val faces: FaceAnalyzer,
     private val editor: GroupEditor,
+    private val settings: SettingsRepository,
 ) : ViewModel() {
     private val _state = MutableStateFlow<DuelUiState>(DuelUiState.Loading)
     val state: StateFlow<DuelUiState> = _state.asStateFlow()
@@ -109,7 +111,7 @@ class DuelViewModel(
     private suspend fun load() {
         val g = groups.getGroup(groupId)
         if (g == null) {
-            _state.value = DuelUiState.Error("This group no longer exists.")
+            _state.value = DuelUiState.Error("This stack no longer exists.")
             return
         }
         group = g
@@ -125,7 +127,7 @@ class DuelViewModel(
         }
         stored = null
         if (g.mediaIds.size < 2) {
-            _state.value = DuelUiState.Error("This group has fewer than two photos left.")
+            _state.value = DuelUiState.Error("This stack has fewer than two photos left.")
             return
         }
 
@@ -279,11 +281,11 @@ class DuelViewModel(
         editor.removePhoto(challenger)
         if (groups.getGroup(groupId) == null) {
             // Only two photos were left, so there's no group anymore and nothing to choose.
-            _events.send(DuelEvent.Message("Kept both. They're no longer grouped."))
+            _events.send(DuelEvent.Message("Kept both. They're no longer stacked."))
             _events.send(DuelEvent.Close)
             return@act
         }
-        _events.send(DuelEvent.Message("Kept both. That photo is no longer in this group."))
+        _events.send(DuelEvent.Message("Kept both. That photo left this stack."))
         load()
     }
 
@@ -322,6 +324,7 @@ class DuelViewModel(
     /** Called after the system trash dialog was confirmed. */
     fun onTrashed(count: Int) = act {
         finish()
+        settings.addTrashed(count)
         _events.send(DuelEvent.Message("Moved $count ${if (count == 1) "photo" else "photos"} to trash"))
         _events.send(DuelEvent.Close)
     }
@@ -360,6 +363,7 @@ class DuelViewModel(
             preScores = graph.data.preScores,
             faces = graph.faces,
             editor = graph.data.editor,
+            settings = graph.data.settings,
         )
     }
 }

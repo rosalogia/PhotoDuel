@@ -6,14 +6,13 @@ import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Share
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalContext
 import coil3.map.Mapper
 import coil3.request.Options
 import dev.rosalogia.photoduel.core.common.AppLog
+import dev.rosalogia.photoduel.core.ui.BrandIcons
 import dev.rosalogia.photoduel.core.ui.PhotoActions
 import dev.rosalogia.photoduel.core.ui.PhotoRef
 import dev.rosalogia.photoduel.core.ui.ShareAction
@@ -44,11 +43,13 @@ fun rememberAndroidPhotoActions(): PhotoActions {
 
             override suspend fun trash(ids: List<Long>) = request(library.trashRequest(ids))
 
+            override val trashNote = "Restorable for 30 days"
+
             override val canFavorite = true
 
             override suspend fun favorite(ids: List<Long>) = request(library.favoriteRequest(ids))
 
-            override val share = ShareAction("Share", Icons.Filled.Share)
+            override val share = ShareAction("Share", BrandIcons.Share)
 
             override fun share(ids: List<Long>) = context.startActivity(library.shareIntent(ids))
 

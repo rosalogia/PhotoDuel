@@ -1,30 +1,23 @@
 package dev.rosalogia.photoduel.theme
 
-import android.os.Build
-import androidx.compose.foundation.isSystemInDarkTheme
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.dynamicDarkColorScheme
-import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.platform.LocalContext
-import dev.rosalogia.photoduel.core.ui.BrandColors
+import androidx.compose.ui.text.font.Font
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
+import dev.rosalogia.photoduel.R
+import dev.rosalogia.photoduel.core.ui.BrandFonts
+import dev.rosalogia.photoduel.core.ui.BrandTheme
 
+/** Geist and Geist Mono, subset to Latin, from res/font (SIL OFL; see assets/licenses). */
+private val AppFonts = BrandFonts(
+  sans = FontFamily(
+    Font(R.font.geist_light, FontWeight.Light),
+    Font(R.font.geist_regular, FontWeight.Normal),
+    Font(R.font.geist_medium, FontWeight.Medium),
+  ),
+  mono = FontFamily(Font(R.font.geist_mono_regular, FontWeight.Normal)),
+)
+
+/** The brand theme: dark everywhere, one accent; it doesn't follow wallpaper colors. */
 @Composable
-fun PhotoDuelTheme(
-  darkTheme: Boolean = isSystemInDarkTheme(),
-  // Dynamic color is available on Android 12+
-  dynamicColor: Boolean = true,
-  content: @Composable () -> Unit,
-) {
-  val colorScheme =
-    when {
-      dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
-        val context = LocalContext.current
-        if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
-      }
-      darkTheme -> BrandColors.dark
-      else -> BrandColors.light
-    }
-
-  MaterialTheme(colorScheme = colorScheme, typography = Typography, content = content)
-}
+fun PhotoDuelTheme(content: @Composable () -> Unit) = BrandTheme(AppFonts, content)

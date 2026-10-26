@@ -1,32 +1,22 @@
 package dev.rosalogia.photoduel.feature.highlights
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.DateRange
-import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.DatePickerDefaults
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.DateRangePicker
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilledTonalButton
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.SelectableDates
@@ -43,22 +33,26 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import coil3.compose.AsyncImage
 import dev.rosalogia.photoduel.core.data.db.HighlightPhase
 import dev.rosalogia.photoduel.core.data.db.HighlightSetSummary
 import dev.rosalogia.photoduel.core.data.highlights.SeriesKind
 import dev.rosalogia.photoduel.core.data.highlights.SeriesSuggestion
-import dev.rosalogia.photoduel.core.ui.PhotoRef
+import dev.rosalogia.photoduel.core.ui.BrandCard
+import dev.rosalogia.photoduel.core.ui.BrandIconButton
+import dev.rosalogia.photoduel.core.ui.BrandIcons
+import dev.rosalogia.photoduel.core.ui.Ink
+import dev.rosalogia.photoduel.core.ui.PhotoThumb
+import dev.rosalogia.photoduel.core.ui.Readout
+import dev.rosalogia.photoduel.core.ui.SecondaryButton
+import dev.rosalogia.photoduel.core.ui.SectionLabel
 import dev.rosalogia.photoduel.core.ui.graphViewModel
-import kotlin.math.roundToInt
 import java.time.Instant
 import java.time.ZoneOffset
 import java.time.temporal.ChronoUnit
+import kotlin.math.roundToInt
 
 /** The Highlights tab: sets in progress or done, suggested days and trips, and a date picker. */
 @Composable
@@ -70,35 +64,38 @@ fun HighlightsTab(onOpenSet: (Long) -> Unit, viewModel: HighlightsHomeViewModel 
     var deleting by remember { mutableStateOf<HighlightSetSummary?>(null) }
 
     LazyColumn(
-        contentPadding = PaddingValues(16.dp),
+        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 20.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
-        modifier = Modifier.fillMaxSize().testTag("highlightsTab"),
+        modifier = Modifier.widthIn(max = 760.dp).fillMaxSize().testTag("highlightsTab"),
     ) {
         item {
-            Text(
-                "Pick the best shots of a day or a trip. Bursts count once, and nothing gets deleted.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Spacer(Modifier.height(8.dp))
-            FilledTonalButton(onClick = { pickingDates = true }, modifier = Modifier.fillMaxWidth().testTag("chooseDates")) {
-                Icon(Icons.Filled.DateRange, contentDescription = null)
-                Text("  Choose dates")
+            Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                Text(
+                    "The best shots of a day or a trip. Bursts count once, and nothing is deleted.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = Ink.Dim,
+                )
+                SecondaryButton(
+                    "Choose dates",
+                    onClick = { pickingDates = true },
+                    icon = BrandIcons.Calendar,
+                    modifier = Modifier.fillMaxWidth().testTag("chooseDates"),
+                )
             }
         }
         if (state.sets.isNotEmpty()) {
-            item { SectionTitle("Your highlights") }
+            item { SectionLabel("Your highlights", Modifier.padding(top = 20.dp, bottom = 4.dp)) }
             items(state.sets, key = { "set-${it.set.setId}" }) { s ->
                 SetCard(s, onClick = { onOpenSet(s.set.setId) }, onDelete = { deleting = s })
             }
         }
-        item { SectionTitle("Suggestions") }
+        item { SectionLabel("Suggestions", Modifier.padding(top = 20.dp, bottom = 4.dp)) }
         if (state.loaded && state.suggestions.isEmpty()) {
             item {
                 Text(
                     "No busy days found yet. Choose dates to start one yourself.",
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = Ink.Dim,
                 )
             }
         }
@@ -122,41 +119,40 @@ fun HighlightsTab(onOpenSet: (Long) -> Unit, viewModel: HighlightsHomeViewModel 
     deleting?.let { s ->
         AlertDialog(
             onDismissRequest = { deleting = null },
-            title = { Text("Delete \"${s.set.name}\"?") },
-            text = { Text("Your picks for this set are forgotten. Photos and album copies stay where they are.") },
+            containerColor = Ink.Raised,
+            title = { Text("Delete “${s.set.name}”?") },
+            text = { Text("Your picks for this set are forgotten. Photos and album copies stay where they are.", color = Ink.Dim) },
             confirmButton = {
-                TextButton(onClick = {
-                    viewModel.delete(s.set.setId)
-                    deleting = null
-                }) { Text("Delete") }
+                TextButton(
+                    onClick = {
+                        viewModel.delete(s.set.setId)
+                        deleting = null
+                    },
+                    colors = ButtonDefaults.textButtonColors(contentColor = Ink.Trash),
+                ) { Text("Delete") }
             },
-            dismissButton = { TextButton(onClick = { deleting = null }) { Text("Cancel") } },
+            dismissButton = { TextButton(onClick = { deleting = null }, colors = ButtonDefaults.textButtonColors(contentColor = Ink.Fg)) { Text("Cancel") } },
         )
     }
 }
 
 @Composable
-private fun SectionTitle(text: String) {
-    Text(text, style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = 12.dp, bottom = 4.dp))
-}
-
-@Composable
 private fun SetCard(s: HighlightSetSummary, onClick: () -> Unit, onDelete: () -> Unit) {
-    Card(Modifier.fillMaxWidth().clickable(onClick = onClick).testTag("highlightSet")) {
-        Row(Modifier.padding(start = 16.dp, top = 12.dp, bottom = 12.dp, end = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) {
+    BrandCard(Modifier.fillMaxWidth().testTag("highlightSet"), onClick = onClick) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f).padding(start = 4.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(s.set.name, style = MaterialTheme.typography.titleMedium)
-                Text(
+                Readout(
                     when (s.set.phase) {
-                        HighlightPhase.DONE -> "${s.selectedCount} highlights from ${s.itemCount} photos"
-                        HighlightPhase.TRIM -> "Narrowing ${s.itemCount} photos down to ${s.set.targetCount}"
-                        HighlightPhase.CULL -> "In progress · ${s.itemCount} photos, aiming for ${s.set.targetCount}"
+                        HighlightPhase.DONE -> "${s.selectedCount} highlights · from ${s.itemCount} photos"
+                        HighlightPhase.TRIM -> "Narrowing ${s.itemCount} down to ${s.set.targetCount}"
+                        HighlightPhase.CULL -> "In progress · ${s.itemCount} photos · aiming for ${s.set.targetCount}"
                     },
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    small = true,
+                    color = if (s.set.phase == HighlightPhase.DONE) Ink.Kept else Ink.Dim,
                 )
             }
-            IconButton(onClick = onDelete) { Icon(Icons.Filled.Delete, contentDescription = "Delete ${s.set.name}") }
+            BrandIconButton(BrandIcons.Trash, "Delete ${s.set.name}", onDelete, tint = Ink.Dim)
         }
     }
 }
@@ -164,30 +160,15 @@ private fun SetCard(s: HighlightSetSummary, onClick: () -> Unit, onDelete: () ->
 @Composable
 private fun SuggestionCard(s: SeriesSuggestion, onClick: () -> Unit) {
     val days = ChronoUnit.DAYS.between(s.start, s.end) + 1
-    Card(
-        Modifier.fillMaxWidth().clickable(onClick = onClick).testTag("suggestion"),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
-    ) {
-        Row(Modifier.padding(horizontal = 16.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) {
+    BrandCard(Modifier.fillMaxWidth().testTag("suggestion"), onClick = onClick) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f).padding(start = 4.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(formatDays(s.start, s.end), style = MaterialTheme.typography.titleMedium)
-                Text(
-                    (if (s.kind == SeriesKind.TRIP) "Trip · $days days · " else "") + "${s.photoCount} photos",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+                Readout((if (s.kind == SeriesKind.TRIP) "Trip · $days days · " else "") + "${s.photoCount} photos", small = true)
             }
             // A glimpse of the day, so it's recognizable without remembering the date.
             Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                s.preview.forEach { id ->
-                    AsyncImage(
-                        model = PhotoRef(id),
-                        contentDescription = null,
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier.size(40.dp).clip(RoundedCornerShape(6.dp))
-                            .background(MaterialTheme.colorScheme.surfaceVariant),
-                    )
-                }
+                s.preview.forEach { id -> PhotoThumb(id, Modifier.size(44.dp), corner = 6.dp) }
             }
         }
     }
@@ -203,8 +184,14 @@ private fun DateRangeDialog(onDismiss: () -> Unit, onPicked: (java.time.LocalDat
     )
     // The picker works in UTC midnights.
     fun day(millis: Long) = Instant.ofEpochMilli(millis).atZone(ZoneOffset.UTC).toLocalDate()
+    val colors = DatePickerDefaults.colors(
+        containerColor = Ink.Raised,
+        dayInSelectionRangeContainerColor = Ink.Kept.copy(alpha = 0.18f),
+        dayInSelectionRangeContentColor = Ink.Fg,
+    )
     DatePickerDialog(
         onDismissRequest = onDismiss,
+        colors = colors,
         confirmButton = {
             val start = picker.selectedStartDateMillis
             TextButton(
@@ -213,9 +200,9 @@ private fun DateRangeDialog(onDismiss: () -> Unit, onPicked: (java.time.LocalDat
                 modifier = Modifier.testTag("confirmDates"),
             ) { Text("Next") }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+        dismissButton = { TextButton(onClick = onDismiss, colors = ButtonDefaults.textButtonColors(contentColor = Ink.Fg)) { Text("Cancel") } },
     ) {
-        DateRangePicker(state = picker, modifier = Modifier.weight(1f))
+        DateRangePicker(state = picker, colors = colors, modifier = Modifier.weight(1f))
     }
 }
 
@@ -230,6 +217,7 @@ private fun DraftDialog(
     val n = d.candidates
     AlertDialog(
         onDismissRequest = onDismiss,
+        containerColor = Ink.Raised,
         title = { Text("New highlights") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -241,15 +229,12 @@ private fun DraftDialog(
                     modifier = Modifier.fillMaxWidth().testTag("draftName"),
                 )
                 when {
-                    n == null -> Text("Counting photos…")
-                    n == 0 -> Text("No camera photos on these days.")
+                    n == null -> Readout("Counting photos…")
+                    n == 0 -> Text("No camera photos on these days.", color = Ink.Dim)
                     else -> {
                         val bursts = (d.rawPhotos ?: n) - n
-                        Text(
-                            "$n photos" + if (bursts > 0) " (${d.rawPhotos} shots, with each burst counted once)" else "",
-                            style = MaterialTheme.typography.bodyMedium,
-                        )
-                        Text("Pick your top ${d.target}", style = MaterialTheme.typography.titleMedium, modifier = Modifier.testTag("draftTarget"))
+                        Readout("$n photos" + if (bursts > 0) " · ${d.rawPhotos} shots, bursts counted once" else "", maxLines = 2)
+                        Text("Your top ${d.target}", style = MaterialTheme.typography.headlineSmall, color = Ink.Fg, modifier = Modifier.testTag("draftTarget"))
                         val max = minOf(n, 100)
                         if (max > 1) {
                             Slider(
@@ -266,6 +251,6 @@ private fun DraftDialog(
         confirmButton = {
             TextButton(onClick = onCreate, enabled = (n ?: 0) > 0, modifier = Modifier.testTag("createSet")) { Text("Start") }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+        dismissButton = { TextButton(onClick = onDismiss, colors = ButtonDefaults.textButtonColors(contentColor = Ink.Fg)) { Text("Cancel") } },
     )
 }

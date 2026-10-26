@@ -4,26 +4,32 @@ import android.Manifest
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
-import androidx.compose.material3.Button
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import dev.rosalogia.photoduel.core.ui.APP_NAME
+import dev.rosalogia.photoduel.core.ui.BrandIcons
+import dev.rosalogia.photoduel.core.ui.Ink
+import dev.rosalogia.photoduel.core.ui.Moment
+import dev.rosalogia.photoduel.core.ui.PrimaryButton
+import dev.rosalogia.photoduel.core.ui.QuietButton
 
 /** The permissions to ask for on this Android version. Asking for both on 14+ lets the user pick partial access. */
 val mediaPermissions: Array<String> = when {
@@ -40,43 +46,44 @@ fun rememberMediaPermissionLauncher(onResult: () -> Unit): () -> Unit {
 
 @Composable
 fun PermissionScreen(onRequest: () -> Unit) {
-    Column(
-        modifier = Modifier.fillMaxSize().safeDrawingPadding().padding(32.dp),
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        Text("Find your best shot", style = MaterialTheme.typography.headlineMedium, textAlign = TextAlign.Center)
-        Spacer(Modifier.height(16.dp))
-        Text(
-            "Photo Duel looks through your camera roll for bursts of similar photos, then helps you " +
-                "pick the best one in each with quick side-by-side duels.\n\n" +
-                "It needs access to your photos to do that. Everything stays on this phone: " +
-                "the app has no internet access.",
-            style = MaterialTheme.typography.bodyLarge,
-            textAlign = TextAlign.Center,
-        )
-        Spacer(Modifier.height(32.dp))
-        Button(onClick = onRequest, modifier = Modifier.testTag("grantAccess")) { Text("Allow photo access") }
+    Box(Modifier.fillMaxSize().safeDrawingPadding(), contentAlignment = Alignment.CenterStart) {
+        Moment(
+            title = "Keep the best one.",
+            body = "$APP_NAME finds groups of near-identical photos in your camera roll. Compare them two at a time and keep the best.",
+            mark = true,
+        ) {
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.padding(vertical = 8.dp)) {
+                Promise("You choose. Nothing is picked for you.")
+                Promise("Everything stays on this phone.")
+                Promise("Nothing is deleted without asking.")
+            }
+            PrimaryButton("Allow photo access", onRequest, Modifier.testTag("grantAccess"))
+        }
     }
 }
 
-/** Shown above the groups list when the user only granted access to selected photos (Android 14+). */
+@Composable
+private fun Promise(text: String) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Icon(BrandIcons.Check, contentDescription = null, tint = Ink.Kept, modifier = Modifier.size(16.dp))
+        Spacer(Modifier.width(10.dp))
+        Text(text, style = MaterialTheme.typography.bodyMedium)
+    }
+}
+
+/** Shown above the stacks when the user only granted access to selected photos (Android 14+). */
 @Composable
 fun PartialAccessBanner(onGrantMore: () -> Unit) {
-    Surface(
-        color = MaterialTheme.colorScheme.secondaryContainer,
-        modifier = Modifier.fillMaxWidth(),
+    Row(
+        modifier = Modifier.fillMaxWidth().background(Ink.Surface).padding(start = 20.dp, end = 8.dp, top = 4.dp, bottom = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(
-                "Photo Duel can only see the photos you selected.",
-                style = MaterialTheme.typography.bodyMedium,
-                modifier = Modifier.weight(1f),
-            )
-            TextButton(onClick = onGrantMore) { Text("Allow all") }
-        }
+        Text(
+            "$APP_NAME can only see the photos you selected.",
+            style = MaterialTheme.typography.bodySmall,
+            color = Ink.Dim,
+            modifier = Modifier.weight(1f),
+        )
+        QuietButton("Allow all", onGrantMore, color = Ink.Kept)
     }
 }

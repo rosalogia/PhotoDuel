@@ -1,64 +1,52 @@
 package dev.rosalogia.photoduel.settings
 
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import dev.rosalogia.photoduel.BuildConfig
-import dev.rosalogia.photoduel.core.data.settings.Settings
+import dev.rosalogia.photoduel.core.ui.APP_NAME
+import dev.rosalogia.photoduel.core.ui.BrandTopBar
+import dev.rosalogia.photoduel.core.ui.Ink
+import dev.rosalogia.photoduel.core.ui.Readout
+import dev.rosalogia.photoduel.core.ui.SecondaryButton
+import dev.rosalogia.photoduel.core.ui.SectionLabel
 import dev.rosalogia.photoduel.feature.groups.GroupingSettings
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(onBack: () -> Unit, onOpenLogs: () -> Unit) {
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Settings") },
-                navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back") } },
-            )
-        },
-    ) { padding ->
-        Column(Modifier.padding(padding).fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp)) {
+    Column(Modifier.fillMaxSize().safeDrawingPadding()) {
+        BrandTopBar(title = "Settings", onBack = onBack, large = true)
+        Column(
+            Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp, vertical = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(36.dp),
+        ) {
             GroupingSettings()
 
             if (BuildConfig.SHOW_DEBUG_TOOLS) {
-                Spacer(Modifier.height(24.dp))
-                HorizontalDivider()
-                Spacer(Modifier.height(16.dp))
-                Text("Troubleshooting", style = MaterialTheme.typography.titleMedium)
-                Text(
-                    "If something looks wrong, the logs help figure out why. They stay on this phone unless you share them.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Spacer(Modifier.height(8.dp))
-                OutlinedButton(onClick = onOpenLogs, modifier = Modifier.testTag("openLogs")) { Text("View and share logs") }
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    SectionLabel("Troubleshooting")
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        "If something looks wrong, the logs help figure out why. They stay on this phone unless you share them.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Ink.Dim,
+                    )
+                    SecondaryButton("View and share logs", onOpenLogs, Modifier.testTag("openLogs"))
+                }
             }
-            Spacer(Modifier.height(24.dp))
-            Text(
-                "Photo Duel ${BuildConfig.VERSION_NAME} · everything stays on this phone",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            Readout("$APP_NAME ${BuildConfig.VERSION_NAME} · on this phone only", small = true, color = Ink.Faint)
         }
     }
 }

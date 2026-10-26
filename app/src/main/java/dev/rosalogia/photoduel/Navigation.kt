@@ -1,9 +1,5 @@
 package dev.rosalogia.photoduel
 
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -17,6 +13,8 @@ import androidx.navigation3.runtime.entryProvider
 import androidx.navigation3.runtime.rememberNavBackStack
 import androidx.navigation3.runtime.rememberSaveableStateHolderNavEntryDecorator
 import androidx.navigation3.ui.NavDisplay
+import dev.rosalogia.photoduel.core.ui.BrandIconButton
+import dev.rosalogia.photoduel.core.ui.BrandIcons
 import dev.rosalogia.photoduel.debug.DebugLogScreen
 import dev.rosalogia.photoduel.feature.duel.DuelRoute
 import dev.rosalogia.photoduel.feature.duel.FeedRoute
@@ -73,9 +71,7 @@ fun MainNavigation(partialAccess: Boolean, onRequestMoreAccess: () -> Unit) {
                     onOpenGroup = { backStack.add(DuelKey(it)) },
                     onEditGroup = { backStack.add(EditGroupKey(it)) },
                     topBarActions = {
-                        IconButton(onClick = { backStack.add(SettingsKey) }, modifier = Modifier.testTag("openSettings")) {
-                            Icon(Icons.Filled.Settings, contentDescription = "Settings")
-                        }
+                        BrandIconButton(BrandIcons.Settings, "Settings", { backStack.add(SettingsKey) }, Modifier.testTag("openSettings"))
                     },
                     banner = { if (partialAccess) PartialAccessBanner(onGrantMore = onRequestMoreAccess) },
                     highlights = { HighlightsTab(onOpenSet = { backStack.add(HighlightKey(it)) }) },

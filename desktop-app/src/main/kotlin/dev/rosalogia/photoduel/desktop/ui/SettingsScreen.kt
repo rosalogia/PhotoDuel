@@ -3,20 +3,12 @@ package dev.rosalogia.photoduel.desktop.ui
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -25,6 +17,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import dev.rosalogia.photoduel.core.ui.APP_NAME
+import dev.rosalogia.photoduel.core.ui.BrandIconButton
+import dev.rosalogia.photoduel.core.ui.BrandIcons
+import dev.rosalogia.photoduel.core.ui.Ink
+import dev.rosalogia.photoduel.core.ui.Readout
+import dev.rosalogia.photoduel.core.ui.SecondaryButton
+import dev.rosalogia.photoduel.core.ui.SectionLabel
 import dev.rosalogia.photoduel.desktop.AppDirs
 import dev.rosalogia.photoduel.desktop.DesktopApp
 import dev.rosalogia.photoduel.desktop.VERSION
@@ -39,63 +38,59 @@ import java.io.File
 fun SettingsScreen(app: DesktopApp) {
     val folders by app.folders.folders.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
-    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(24.dp)) {
-        Column(Modifier.widthIn(max = 640.dp)) {
-            Text("Settings", style = MaterialTheme.typography.headlineSmall)
-            Spacer(Modifier.height(24.dp))
-            Text("Photo folders", style = MaterialTheme.typography.titleMedium)
-            Text(
-                "Camera photos (JPEG and HEIC) in these folders and their subfolders. Screenshots folders and " +
-                    "the Highlights albums are skipped.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Spacer(Modifier.height(8.dp))
-            folders.forEach { folder ->
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    FolderText(folder, MaterialTheme.typography.bodyMedium, Modifier.weight(1f))
-                    IconButton(onClick = { app.folders.remove(folder) }, enabled = folders.size > 1) {
-                        Icon(Icons.Filled.Close, contentDescription = "Remove ${folder.path}")
+    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 40.dp, vertical = 32.dp)) {
+        Column(Modifier.widthIn(max = 640.dp), verticalArrangement = Arrangement.spacedBy(40.dp)) {
+            Text("Settings", style = MaterialTheme.typography.displaySmall)
+
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                SectionLabel("Photo folders")
+                Text(
+                    "Camera photos (JPEG and HEIC) in these folders and their subfolders. Screenshot folders and " +
+                        "the Highlights albums are skipped.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Ink.Dim,
+                    modifier = Modifier.padding(top = 8.dp, bottom = 4.dp),
+                )
+                folders.forEach { folder ->
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        FolderText(folder, MaterialTheme.typography.bodyMedium, Modifier.weight(1f))
+                        BrandIconButton(
+                            BrandIcons.Close,
+                            "Remove ${folder.path}",
+                            onClick = { app.folders.remove(folder) },
+                            enabled = folders.size > 1,
+                            tint = Ink.Dim,
+                        )
                     }
                 }
+                SecondaryButton("Add a folder…", icon = BrandIcons.Folder, onClick = {
+                    scope.launch {
+                        val picked = withContext(Dispatchers.IO) { FolderPicker.pick(folders.firstOrNull()) } ?: return@launch
+                        app.folders.add(picked)
+                    }
+                })
+                // Not a readout: upper case would misstate a case-sensitive path.
+                Text(
+                    "Highlight albums go to ${displayPath(app.highlightsRoot)}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Ink.Dim,
+                    modifier = Modifier.padding(top = 8.dp),
+                )
             }
-            OutlinedButton(onClick = {
-                scope.launch {
-                    val picked = withContext(Dispatchers.IO) { FolderPicker.pick(folders.firstOrNull()) } ?: return@launch
-                    app.folders.add(picked)
-                }
-            }) { Text("Add a folder…") }
-            Spacer(Modifier.height(8.dp))
-            Text(
-                "Highlight albums are copied to ${displayPath(app.highlightsRoot)}",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
 
-            Spacer(Modifier.height(24.dp))
-            HorizontalDivider()
-            Spacer(Modifier.height(16.dp))
             GroupingSettings()
 
-            Spacer(Modifier.height(24.dp))
-            HorizontalDivider()
-            Spacer(Modifier.height(16.dp))
-            Text("Troubleshooting", style = MaterialTheme.typography.titleMedium)
-            Text(
-                "If something looks wrong, the logs help figure out why. They stay on this computer unless you share them.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Spacer(Modifier.height(8.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedButton(onClick = { SystemFiles.open(File(AppDirs.data, "logs")) }) { Text("Open logs folder") }
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                SectionLabel("Troubleshooting")
+                Text(
+                    "If something looks wrong, the logs help figure out why. They stay on this computer unless you share them.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Ink.Dim,
+                    modifier = Modifier.padding(top = 4.dp),
+                )
+                SecondaryButton("Open logs folder", icon = BrandIcons.Open, onClick = { SystemFiles.open(File(AppDirs.data, "logs")) })
             }
-            Spacer(Modifier.height(16.dp))
-            Text(
-                "Photo Duel $VERSION · everything stays on this computer",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            Readout("$APP_NAME $VERSION · on this computer only", small = true, color = Ink.Faint)
         }
     }
 }

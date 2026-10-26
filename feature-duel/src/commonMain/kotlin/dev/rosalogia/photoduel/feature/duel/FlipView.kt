@@ -8,6 +8,8 @@ import androidx.compose.foundation.gestures.calculatePan
 import androidx.compose.foundation.gestures.calculateZoom
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
@@ -18,12 +20,16 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.Matrix
 import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.PointerEventType
@@ -32,6 +38,7 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalViewConfiguration
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
@@ -40,6 +47,7 @@ import dev.rosalogia.photoduel.feature.duel.align.Alignment
 import kotlin.math.abs
 import kotlin.math.min
 import kotlin.math.pow
+import kotlin.math.roundToInt
 
 /** Zoom and pan shared by both photos, so flipping keeps the same spot on screen. */
 @Stable
@@ -119,6 +127,11 @@ fun FlipView(
     onSwipe: (keepChallenger: Boolean) -> Unit,
     onDrag: (Float) -> Unit,
     modifier: Modifier = Modifier,
+    /** A hairline drawn around the photo as it appears on screen, zoom included; null for none. */
+    frameColor: Color? = null,
+    frameWidth: Dp = 2.dp,
+    /** A label pinned inside the photo's top-left corner. */
+    tag: (@Composable () -> Unit)? = null,
 ) {
     val swipeThreshold = with(LocalDensity.current) { 96.dp.toPx() }
     val doubleTapTimeout = LocalViewConfiguration.current.doubleTapTimeoutMillis
@@ -235,7 +248,47 @@ fun FlipView(
             val matrix = if (alignment != null) alignedMatrix(challenger, king, alignment, size) else fitMatrix(challenger, size)
             drawWithMatrix(challenger, matrix)
         }
+        if (frameColor != null || tag != null) {
+            // An unaligned challenger may have another shape; aligned, it sits exactly over the king.
+            val shown = if (showChallenger && alignment == null) challenger else king
+            val rect = visibleRect(shown, zoom)
+            if (frameColor != null) {
+                Canvas(Modifier.fillMaxSize()) {
+                    val w = frameWidth.toPx()
+                    drawRoundRect(
+                        color = frameColor,
+                        topLeft = Offset(rect.left + w / 2, rect.top + w / 2),
+                        size = Size(rect.width - w, rect.height - w),
+                        cornerRadius = CornerRadius(3.dp.toPx()),
+                        style = Stroke(w),
+                    )
+                }
+            }
+            if (tag != null) {
+                Box(Modifier.offset { IntOffset(rect.left.roundToInt(), rect.top.roundToInt()) }.padding(10.dp)) { tag() }
+            }
+        }
     }
+}
+
+/** Where [image] appears in the view, after fitting and the current zoom, clipped to the view. */
+private fun visibleRect(image: ImageBitmap, zoom: ZoomState): Rect {
+    val view = zoom.viewport
+    if (view.width == 0 || view.height == 0) return Rect.Zero
+    val s = min(view.width.toFloat() / image.width, view.height.toFloat() / image.height)
+    val w = image.width * s
+    val h = image.height * s
+    val cx = view.width / 2f
+    val cy = view.height / 2f
+    // The zoom layer scales about the view's center, then translates.
+    fun x(v: Float) = cx + (v - cx) * zoom.scale + zoom.offset.x
+    fun y(v: Float) = cy + (v - cy) * zoom.scale + zoom.offset.y
+    return Rect(
+        left = x(cx - w / 2).coerceAtLeast(0f),
+        top = y(cy - h / 2).coerceAtLeast(0f),
+        right = x(cx + w / 2).coerceAtMost(view.width.toFloat()),
+        bottom = y(cy + h / 2).coerceAtMost(view.height.toFloat()),
+    )
 }
 
 /** Fills about half the view height with the face, centered. */
